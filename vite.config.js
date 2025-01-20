@@ -9,4 +9,9 @@ export default defineConfig({
       "./runtimeConfig": "./runtimeConfig.browser",
     },
   },
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts'
+  }
 })
