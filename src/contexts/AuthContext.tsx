@@ -1,150 +1,84 @@
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { AuthContextType, AuthError, AuthUser, UserRole } from '../types/auth.types'
 import { supabase } from '../lib/supabase'
 import { Session, User } from '@supabase/supabase-js'
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined)
-
-export const useAuth = () => {
-    const context = useContext(AuthContext)
-    if (!context) {
-        throw new Error('useAuth must be used within an AuthProvider')
-    }
-    return context
+interface AuthContextType {
+    session: Session | null
+    user: User | null
+    signIn: (data: { email: string; password: string }) => Promise<{ error: Error | null }>
+    signUp: (data: { email: string; password: string }) => Promise<{ error: Error | null }>
+    signOut: () => Promise<void>
+    resetPassword: (data: { password: string; token: string }) => Promise<{ error: Error | null }>
+    sendResetEmail: (email: string) => Promise<{ error: Error | null }>
 }
 
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-    const [user, setUser] = useState<AuthUser | null>(null)
-    const [loading, setLoading] = useState(true)
-    const [error, setError] = useState<AuthError | null>(null)
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
-    // Handle session changes
+export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const [session, setSession] = useState<Session | null>(null)
+    const [user, setUser] = useState<User | null>(null)
+
     useEffect(() => {
         // Get initial session
         supabase.auth.getSession().then(({ data: { session } }) => {
-            handleSession(session)
-            setLoading(false)
+            setSession(session)
+            setUser(session?.user ?? null)
         })
 
         // Listen for auth changes
         const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-            handleSession(session)
+            setSession(session)
+            setUser(session?.user ?? null)
         })
 
         return () => subscription.unsubscribe()
     }, [])
 
-    // Handle session update
-    const handleSession = (session: Session | null) => {
-        if (session?.user) {
-            // Get user's role and team_id from profiles table
-            supabase
-                .from('profiles')
-                .select('role, team_id')
-                .eq('id', session.user.id)
-                .single()
-                .then(({ data, error: profileError }) => {
-                    if (profileError) {
-                        console.error('Error fetching user profile:', profileError)
-                        setUser(session.user as AuthUser)
-                    } else {
-                        setUser({
-                            ...session.user,
-                            role: data?.role as UserRole,
-                            team_id: data?.team_id
-                        })
-                    }
-                })
-        } else {
-            setUser(null)
-        }
+    const signIn = async (data: { email: string; password: string }) => {
+        const { error } = await supabase.auth.signInWithPassword(data)
+        return { error }
     }
 
-    // Sign in with email and password
-    const signIn = async (email: string, password: string) => {
-        try {
-            setLoading(true)
-            setError(null)
-            const { error } = await supabase.auth.signInWithPassword({ email, password })
-            if (error) throw error
-        } catch (err) {
-            setError({ message: err.message, code: err.code })
-            throw err
-        } finally {
-            setLoading(false)
-        }
+    const signUp = async (data: { email: string; password: string }) => {
+        const { error } = await supabase.auth.signUp(data)
+        return { error }
     }
 
-    // Sign up with email and password
-    const signUp = async (email: string, password: string) => {
-        try {
-            setLoading(true)
-            setError(null)
-            const { error } = await supabase.auth.signUp({ email, password })
-            if (error) throw error
-        } catch (err) {
-            setError({ message: err.message, code: err.code })
-            throw err
-        } finally {
-            setLoading(false)
-        }
-    }
-
-    // Sign out
     const signOut = async () => {
-        try {
-            setLoading(true)
-            setError(null)
-            const { error } = await supabase.auth.signOut()
-            if (error) throw error
-        } catch (err) {
-            setError({ message: err.message, code: err.code })
-            throw err
-        } finally {
-            setLoading(false)
-        }
+        await supabase.auth.signOut()
     }
 
-    // Reset password
-    const resetPassword = async (email: string) => {
-        try {
-            setLoading(true)
-            setError(null)
-            const { error } = await supabase.auth.resetPasswordForEmail(email)
-            if (error) throw error
-        } catch (err) {
-            setError({ message: err.message, code: err.code })
-            throw err
-        } finally {
-            setLoading(false)
-        }
+    const resetPassword = async (data: { password: string; token: string }) => {
+        const { error } = await supabase.auth.updateUser({
+            password: data.password
+        })
+        return { error }
     }
 
-    // Update password
-    const updatePassword = async (password: string) => {
-        try {
-            setLoading(true)
-            setError(null)
-            const { error } = await supabase.auth.updateUser({ password })
-            if (error) throw error
-        } catch (err) {
-            setError({ message: err.message, code: err.code })
-            throw err
-        } finally {
-            setLoading(false)
-        }
+    const sendResetEmail = async (email: string) => {
+        const { error } = await supabase.auth.resetPasswordForEmail(email, {
+            redirectTo: `${window.location.origin}/auth/reset-password`
+        })
+        return { error }
     }
 
     const value = {
+        session,
         user,
-        loading,
-        error,
         signIn,
         signUp,
         signOut,
         resetPassword,
-        updatePassword
+        sendResetEmail
     }
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+}
+
+export const useAuth = () => {
+    const context = useContext(AuthContext)
+    if (context === undefined) {
+        throw new Error('useAuth must be used within an AuthProvider')
+    }
+    return context
 } 
