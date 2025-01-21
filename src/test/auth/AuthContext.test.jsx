@@ -55,7 +55,12 @@ const TestComponent = () => {
             {loading && <div>Loading...</div>}
             {error && <div>Error: {error.message}</div>}
             {user && <div>User: {user.email}</div>}
-            <button onClick={() => signIn('test@example.com', 'password').catch(() => { })}>Sign In</button>
+            <button onClick={() => signIn({
+                email: 'test@example.com',
+                password: 'password'
+            }).catch(() => { })}>
+                Sign In
+            </button>
         </div>
     )
 }
