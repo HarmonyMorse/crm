@@ -46,33 +46,33 @@ vi.mock('../../../lib/supabase', () => ({
 }));
 
 const mockTicket = {
-    id: '1',
-    subject: 'Test Ticket',
-    description: 'Test Description',
+    id: '44444444-4444-4444-4444-444444444444',
+    subject: 'Test Ticket 1',
+    description: 'Test Description 1',
     status: TicketStatus.New,
     priority: PriorityLevel.Medium,
-    created_by: 'user1',
-    team_id: 'team1',
+    customer_user_id: '11111111-1111-1111-1111-111111111111',
+    team_id: '33333333-3333-3333-3333-333333333333',
     created_at: '2025-01-21T20:43:31.062Z',
     updated_at: '2025-01-21T20:43:31.063Z'
 };
 
 const mockComments = [
     {
-        id: '1',
-        ticket_id: '1',
+        id: '66666666-6666-6666-6666-666666666666',
+        ticket_id: '44444444-4444-4444-4444-444444444444',
         content: 'Test Comment 1',
         is_internal: false,
-        created_by: 'user1',
+        user_id: '11111111-1111-1111-1111-111111111111',
         created_at: '2025-01-21T20:43:31.063Z',
         updated_at: '2025-01-21T20:43:31.063Z'
     },
     {
-        id: '2',
-        ticket_id: '1',
+        id: '77777777-7777-7777-7777-777777777777',
+        ticket_id: '44444444-4444-4444-4444-444444444444',
         content: 'Test Comment 2',
         is_internal: true,
-        created_by: 'user2',
+        user_id: '22222222-2222-2222-2222-222222222222',
         created_at: '2025-01-21T20:43:31.063Z',
         updated_at: '2025-01-21T20:43:31.063Z'
     }

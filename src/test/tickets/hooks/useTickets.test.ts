@@ -47,24 +47,24 @@ vi.mock('../../../lib/supabase', () => ({
 
 const mockTickets = [
     {
-        id: '1',
+        id: '44444444-4444-4444-4444-444444444444',
         subject: 'Test Ticket 1',
         description: 'Test Description 1',
         status: TicketStatus.New,
         priority: PriorityLevel.Medium,
-        created_by: 'user1',
-        team_id: 'team1',
+        customer_user_id: '11111111-1111-1111-1111-111111111111',
+        team_id: '33333333-3333-3333-3333-333333333333',
         created_at: '2025-01-21T20:43:31.063Z',
         updated_at: '2025-01-21T20:43:31.063Z'
     },
     {
-        id: '2',
+        id: '55555555-5555-5555-5555-555555555555',
         subject: 'Test Ticket 2',
         description: 'Test Description 2',
         status: TicketStatus.Open,
         priority: PriorityLevel.High,
-        created_by: 'user2',
-        team_id: 'team1',
+        customer_user_id: '22222222-2222-2222-2222-222222222222',
+        team_id: '33333333-3333-3333-3333-333333333333',
         created_at: '2025-01-21T20:43:31.063Z',
         updated_at: '2025-01-21T20:43:31.063Z'
     }
