@@ -32,8 +32,32 @@ const createSupabaseMock = (finalResponse: any) => {
         vi.spyOn(builder, key);
         if (key !== 'then' && key !== 'single') {
             builder[key] = vi.fn().mockReturnValue(builder);
+        } else if (key === 'single') {
+            builder[key] = vi.fn().mockImplementation(() => Promise.resolve(finalResponse));
         }
     });
+
+    // Override then to handle both direct calls and chained calls
+    builder.then = (callback: any) => {
+        if (typeof callback === 'function') {
+            return Promise.resolve(finalResponse).then(callback);
+        }
+        return Promise.resolve(finalResponse);
+    };
+
+    // Add support for direct data access
+    Object.defineProperty(builder, 'data', {
+        get: () => finalResponse.data
+    });
+
+    Object.defineProperty(builder, 'error', {
+        get: () => finalResponse.error
+    });
+
+    // Add support for promise-like behavior
+    builder[Symbol.toStringTag] = 'Promise';
+    builder.catch = (callback: any) => Promise.resolve(finalResponse).catch(callback);
+    builder.finally = (callback: any) => Promise.resolve(finalResponse).finally(callback);
 
     return builder;
 };
@@ -77,7 +101,12 @@ describe('useTickets', () => {
         queryClient = new QueryClient({
             defaultOptions: {
                 queries: {
-                    retry: false
+                    retry: false,
+                    gcTime: 0,
+                    staleTime: 0,
+                    refetchOnWindowFocus: false,
+                    refetchOnMount: false,
+                    refetchOnReconnect: false
                 }
             }
         });
@@ -88,7 +117,8 @@ describe('useTickets', () => {
         React.createElement(QueryClientProvider, { client: queryClient }, children);
 
     it('should fetch tickets successfully', async () => {
-        const supabaseMock = createSupabaseMock({ data: mockTickets, error: null });
+        const mockResponse = { data: mockTickets, error: null };
+        const supabaseMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(supabaseMock);
 
         const { result } = renderHook(() => useTickets(), { wrapper });
@@ -101,27 +131,41 @@ describe('useTickets', () => {
     });
 
     it('should apply filters correctly', async () => {
-        const filters: ITicketListParams = {
-            status: [TicketStatus.New],
-            priority: [PriorityLevel.High],
-            search: 'test',
-            sort: {
-                field: 'created_at',
-                direction: 'desc'
-            }
-        };
-
-        const supabaseMock = createSupabaseMock({ data: mockTickets, error: null });
+        const mockResponse = { data: mockTickets, error: null };
+        const supabaseMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(supabaseMock);
 
-        const { result } = renderHook(() => useTickets({ params: filters }), { wrapper });
+        const params = {
+            status: [TicketStatus.New],
+            priority: [PriorityLevel.High],
+            assignee: 'user1',
+            team: 'team1',
+            search: 'test',
+            dateRange: {
+                start: '2025-01-01',
+                end: '2025-01-31'
+            },
+            sort: {
+                field: 'created_at' as const,
+                direction: 'asc' as const
+            },
+            page: 1,
+            limit: 10
+        };
+
+        const { result } = renderHook(() => useTickets({ params }), { wrapper });
 
         await waitFor(() => !result.current.isLoading);
 
-        expect(supabaseMock.in).toHaveBeenCalledWith('status', filters.status);
-        expect(supabaseMock.in).toHaveBeenCalledWith('priority', filters.priority);
-        expect(supabaseMock.ilike).toHaveBeenCalledWith('subject', `%${filters.search}%`);
-        expect(supabaseMock.order).toHaveBeenCalledWith('created_at', { ascending: false });
+        expect(supabaseMock.in).toHaveBeenCalledWith('status', params.status);
+        expect(supabaseMock.in).toHaveBeenCalledWith('priority', params.priority);
+        expect(supabaseMock.eq).toHaveBeenCalledWith('assigned_to', params.assignee);
+        expect(supabaseMock.eq).toHaveBeenCalledWith('team_id', params.team);
+        expect(supabaseMock.ilike).toHaveBeenCalledWith('subject', `%${params.search}%`);
+        expect(supabaseMock.gte).toHaveBeenCalledWith('created_at', params.dateRange.start);
+        expect(supabaseMock.lte).toHaveBeenCalledWith('created_at', params.dateRange.end);
+        expect(supabaseMock.order).toHaveBeenCalledWith(params.sort.field, { ascending: true });
+        expect(supabaseMock.range).toHaveBeenCalledWith(0, 9);
     });
 
     it('should create ticket successfully', async () => {
@@ -165,8 +209,9 @@ describe('useTickets', () => {
             await result.current.updateTicket.mutateAsync(updates);
         });
 
-        expect(supabaseMock.update).toHaveBeenCalledWith({ subject: updates.subject, status: updates.status });
-        expect(supabaseMock.eq).toHaveBeenCalledWith('id', updates.id);
+        const { id, ...updateData } = updates;
+        expect(supabaseMock.update).toHaveBeenCalledWith(updateData);
+        expect(supabaseMock.eq).toHaveBeenCalledWith('id', id);
         expect(supabaseMock.select).toHaveBeenCalledWith('*');
     });
 
@@ -186,8 +231,9 @@ describe('useTickets', () => {
     });
 
     it('should handle fetch error', async () => {
-        const mockError = { message: 'Error loading tickets. Please try again later.' };
-        const supabaseMock = createSupabaseMock({ data: null, error: mockError });
+        const mockError = new Error('Error loading tickets. Please try again later.');
+        const mockResponse = { data: null, error: mockError };
+        const supabaseMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(supabaseMock);
 
         const { result } = renderHook(() => useTickets(), { wrapper });

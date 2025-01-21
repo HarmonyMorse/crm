@@ -1,10 +1,13 @@
 -- Purpose: A simplified schema that removes the "profiles" table and relies on auth.users instead
+-- Conforms to @schema.sql with updated RLS policies and references to auth.users
 
 -- Drop the vector extension if it exists
 DROP EXTENSION IF EXISTS vector CASCADE;
 
--- Cleanup existing schema
-DO $$ 
+--------------------------------------------------------------------------------
+-- CLEANUP EXISTING SCHEMA
+--------------------------------------------------------------------------------
+DO $$
 DECLARE
     r RECORD;
 BEGIN
@@ -15,7 +18,11 @@ BEGIN
         WHERE pronamespace = 'public'::regnamespace
     )
     LOOP
-        EXECUTE 'DROP FUNCTION IF EXISTS public.' || quote_ident(r.proname) || '(' || r.args || ') CASCADE';
+        EXECUTE 'DROP FUNCTION IF EXISTS public.'
+                || quote_ident(r.proname)
+                || '('
+                || r.args
+                || ') CASCADE';
     END LOOP;
 
     -- Drop all tables in public schema
@@ -25,10 +32,12 @@ BEGIN
         WHERE schemaname = 'public'
     )
     LOOP
-        EXECUTE 'DROP TABLE IF EXISTS public.' || quote_ident(r.tablename) || ' CASCADE';
+        EXECUTE 'DROP TABLE IF EXISTS public.'
+                || quote_ident(r.tablename)
+                || ' CASCADE';
     END LOOP;
 
-    -- Drop all custom types
+    -- Drop all custom ENUM types
     FOR r IN (
         SELECT typname
         FROM pg_type
@@ -36,22 +45,30 @@ BEGIN
           AND typtype = 'e'
     )
     LOOP
-        EXECUTE 'DROP TYPE IF EXISTS public.' || quote_ident(r.typname) || ' CASCADE';
+        EXECUTE 'DROP TYPE IF EXISTS public.'
+                || quote_ident(r.typname)
+                || ' CASCADE';
     END LOOP;
 END $$;
 
--- Enable necessary extensions
+--------------------------------------------------------------------------------
+-- EXTENSIONS
+--------------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 CREATE EXTENSION IF NOT EXISTS "vector";
 
--- Create ENUMs (excluding any user_role since profiles are removed)
+--------------------------------------------------------------------------------
+-- ENUM TYPES
+--------------------------------------------------------------------------------
 CREATE TYPE ticket_status AS ENUM ('new', 'open', 'pending', 'on_hold', 'solved', 'closed');
 CREATE TYPE priority_level AS ENUM ('low', 'medium', 'high', 'urgent');
 CREATE TYPE article_status AS ENUM ('draft', 'review', 'published', 'archived');
 CREATE TYPE team_role AS ENUM ('member', 'lead', 'admin');
 
--- Create tables without foreign keys first
+--------------------------------------------------------------------------------
+-- TABLES
+--------------------------------------------------------------------------------
 CREATE TABLE teams (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
@@ -62,8 +79,6 @@ CREATE TABLE teams (
   metadata JSONB DEFAULT '{}'::jsonb
 );
 
--- Replaces "profile_teams" with "user_teams",
--- referencing auth.users directly instead of profiles
 CREATE TABLE user_teams (
   user_id UUID NOT NULL,
   team_id UUID NOT NULL,
@@ -127,7 +142,8 @@ CREATE TABLE articles (
   metadata JSONB DEFAULT '{}'::jsonb,
   tags TEXT[] DEFAULT ARRAY[]::TEXT[],
   search_vector tsvector GENERATED ALWAYS AS (
-    setweight(to_tsvector('english', title), 'A') ||
+    setweight(to_tsvector('english', title), 'A')
+    ||
     setweight(to_tsvector('english', content), 'B')
   ) STORED
 );
@@ -153,7 +169,9 @@ CREATE TABLE embeddings (
   UNIQUE(content_type, content_id)
 );
 
--- Now add foreign keys, referencing auth.users(id) directly
+--------------------------------------------------------------------------------
+-- FOREIGN KEYS
+--------------------------------------------------------------------------------
 ALTER TABLE teams
   ADD CONSTRAINT teams_lead_user_id_fkey 
   FOREIGN KEY (lead_user_id) REFERENCES auth.users(id) ON DELETE SET NULL;
@@ -167,12 +185,12 @@ ALTER TABLE user_teams
 ALTER TABLE tickets
   ADD CONSTRAINT tickets_assignee_user_id_fkey 
   FOREIGN KEY (assignee_user_id) REFERENCES auth.users(id),
-  ADD CONSTRAINT tickets_category_id_fkey 
-  FOREIGN KEY (category_id) REFERENCES categories(id),
   ADD CONSTRAINT tickets_customer_user_id_fkey 
   FOREIGN KEY (customer_user_id) REFERENCES auth.users(id),
   ADD CONSTRAINT tickets_team_id_fkey 
-  FOREIGN KEY (team_id) REFERENCES teams(id);
+  FOREIGN KEY (team_id) REFERENCES teams(id),
+  ADD CONSTRAINT tickets_category_id_fkey 
+  FOREIGN KEY (category_id) REFERENCES categories(id);
 
 ALTER TABLE ticket_comments
   ADD CONSTRAINT ticket_comments_user_id_fkey 
@@ -190,7 +208,9 @@ ALTER TABLE article_versions
   ADD CONSTRAINT article_versions_created_by_user_id_fkey
   FOREIGN KEY (created_by_user_id) REFERENCES auth.users(id);
 
--- Create indexes
+--------------------------------------------------------------------------------
+-- INDEXES
+--------------------------------------------------------------------------------
 CREATE INDEX idx_teams_lead_user_id ON teams(lead_user_id);
 
 CREATE INDEX idx_user_teams_role ON user_teams(role);
@@ -212,9 +232,7 @@ CREATE INDEX idx_ticket_comments_user_id ON ticket_comments(user_id);
 
 CREATE INDEX idx_embeddings_content_type_id ON embeddings(content_type, content_id);
 
--- Additional indexes for common queries and foreign keys
 CREATE INDEX idx_categories_parent_id ON categories(parent_id);
-CREATE INDEX idx_tickets_category_id ON tickets(category_id);
 CREATE INDEX idx_tickets_updated_at ON tickets(updated_at DESC);
 CREATE INDEX idx_ticket_comments_parent_id ON ticket_comments(parent_id);
 CREATE INDEX idx_articles_published_at ON articles(published_at DESC);
@@ -222,7 +240,9 @@ CREATE INDEX idx_articles_updated_at ON articles(updated_at DESC);
 CREATE INDEX idx_article_versions_article_id_version 
   ON article_versions(article_id, version DESC);
 
--- Enable RLS for tables
+--------------------------------------------------------------------------------
+-- ENABLE ROW LEVEL SECURITY
+--------------------------------------------------------------------------------
 ALTER TABLE teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE user_teams ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tickets ENABLE ROW LEVEL SECURITY;
@@ -230,9 +250,11 @@ ALTER TABLE ticket_comments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE articles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE article_versions ENABLE ROW LEVEL SECURITY;
 
--- Create RLS Policies
+--------------------------------------------------------------------------------
+-- RLS POLICIES
+--------------------------------------------------------------------------------
 
--- Teams policies
+-- Teams
 DROP POLICY IF EXISTS "Teams are viewable by members" ON teams;
 DROP POLICY IF EXISTS "Teams can be created by authenticated users" ON teams;
 DROP POLICY IF EXISTS "Teams can be updated by team leads" ON teams;
@@ -258,7 +280,7 @@ USING (
   )
 );
 
--- User Teams policies
+-- User Teams
 DROP POLICY IF EXISTS "User teams are viewable by team members" ON user_teams;
 DROP POLICY IF EXISTS "User teams can be created by authenticated users" ON user_teams;
 
@@ -272,7 +294,7 @@ WITH CHECK (
   -- Users can add themselves
   user_id = auth.uid()
   OR
-  -- Team leads can add others
+  -- Team leads or admins can add others
   EXISTS (
     SELECT 1
     FROM teams t
@@ -281,7 +303,7 @@ WITH CHECK (
   )
 );
 
--- Tickets policies
+-- Tickets
 CREATE POLICY "Tickets are viewable by assigned team members and customers"
 ON tickets FOR SELECT
 USING (
@@ -294,7 +316,7 @@ USING (
   )
 );
 
--- Comments policies
+-- Comments
 CREATE POLICY "Comments are viewable by ticket participants"
 ON ticket_comments FOR SELECT
 USING (
@@ -314,7 +336,7 @@ USING (
   )
 );
 
--- Articles policies
+-- Articles
 CREATE POLICY "Published articles are viewable by everyone"
 ON articles FOR SELECT
 USING (status = 'published');
@@ -330,5 +352,4 @@ USING (
   )
 );
 
--- No trigger or function needed for new user creation,
--- as we no longer store user data in a separate profiles table 
+-- No function needed for user creation, as we rely on auth.users (no separate profiles table) 

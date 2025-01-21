@@ -32,8 +32,32 @@ const createSupabaseMock = (finalResponse: any) => {
         vi.spyOn(builder, key);
         if (key !== 'then' && key !== 'single') {
             builder[key] = vi.fn().mockReturnValue(builder);
+        } else if (key === 'single') {
+            builder[key] = vi.fn().mockImplementation(() => Promise.resolve(finalResponse));
         }
     });
+
+    // Override then to handle both direct calls and chained calls
+    builder.then = (callback: any) => {
+        if (typeof callback === 'function') {
+            return Promise.resolve(finalResponse).then(callback);
+        }
+        return Promise.resolve(finalResponse);
+    };
+
+    // Add support for direct data access
+    Object.defineProperty(builder, 'data', {
+        get: () => finalResponse.data
+    });
+
+    Object.defineProperty(builder, 'error', {
+        get: () => finalResponse.error
+    });
+
+    // Add support for promise-like behavior
+    builder[Symbol.toStringTag] = 'Promise';
+    builder.catch = (callback: any) => Promise.resolve(finalResponse).catch(callback);
+    builder.finally = (callback: any) => Promise.resolve(finalResponse).finally(callback);
 
     return builder;
 };
@@ -85,7 +109,12 @@ describe('useTicket', () => {
         queryClient = new QueryClient({
             defaultOptions: {
                 queries: {
-                    retry: false
+                    retry: false,
+                    gcTime: 0,
+                    staleTime: 0,
+                    refetchOnWindowFocus: false,
+                    refetchOnMount: false,
+                    refetchOnReconnect: false
                 }
             }
         });
@@ -96,7 +125,8 @@ describe('useTicket', () => {
         React.createElement(QueryClientProvider, { client: queryClient }, children);
 
     it('should fetch ticket successfully', async () => {
-        const supabaseMock = createSupabaseMock({ data: mockTicket, error: null });
+        const mockResponse = { data: mockTicket, error: null };
+        const supabaseMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(supabaseMock);
 
         const { result } = renderHook(() => useTicket('1'), { wrapper });
@@ -107,10 +137,12 @@ describe('useTicket', () => {
         expect(result.current.error).toBeNull();
         expect(supabaseMock.select).toHaveBeenCalledWith('*, assignee:assigned_to(id, email), creator:created_by(id, email), team:team_id(id, name)');
         expect(supabaseMock.eq).toHaveBeenCalledWith('id', '1');
+        expect(supabaseMock.single).toHaveBeenCalled();
     });
 
     it('should fetch comments successfully', async () => {
-        const commentsMock = createSupabaseMock({ data: mockComments, error: null });
+        const mockResponse = { data: mockComments, error: null };
+        const commentsMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(commentsMock);
 
         const { result } = renderHook(() => useTicket('1'), { wrapper });
@@ -120,11 +152,13 @@ describe('useTicket', () => {
         expect(result.current.comments).toEqual(mockComments);
         expect(commentsMock.select).toHaveBeenCalledWith('*, creator:created_by(id, email)');
         expect(commentsMock.eq).toHaveBeenCalledWith('ticket_id', '1');
+        expect(commentsMock.order).toHaveBeenCalledWith('created_at', { ascending: true });
     });
 
     it('should handle fetch error', async () => {
-        const mockError = { message: 'Error loading ticket. Please try again later.' };
-        const supabaseMock = createSupabaseMock({ data: null, error: mockError });
+        const mockError = new Error('Error loading ticket. Please try again later.');
+        const mockResponse = { data: null, error: mockError };
+        const supabaseMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(supabaseMock);
 
         const { result } = renderHook(() => useTicket('1'), { wrapper });
