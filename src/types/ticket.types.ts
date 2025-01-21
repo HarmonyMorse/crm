@@ -21,7 +21,7 @@ export interface ITicket {
     description: string;
     status: TicketStatus;
     priority: PriorityLevel;
-    created_by: string;
+    customer_user_id: string;
     assigned_to?: string;
     team_id: string;
     created_at: string;
@@ -36,7 +36,7 @@ export interface ITicketComment {
     ticket_id: string;
     content: string;
     is_internal: boolean;
-    created_by: string;
+    user_id: string;
     created_at: string;
     updated_at: string;
     // Populated fields

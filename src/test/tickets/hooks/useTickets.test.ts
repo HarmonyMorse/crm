@@ -24,7 +24,6 @@ const createSupabaseMock = (finalResponse: any) => {
         gte: () => builder,
         lte: () => builder,
         single: () => Promise.resolve(finalResponse),
-        then: (callback: any) => Promise.resolve(finalResponse).then(callback)
     };
 
     // Add support for chaining and final resolution
@@ -34,6 +33,34 @@ const createSupabaseMock = (finalResponse: any) => {
             builder[key] = vi.fn().mockReturnValue(builder);
         }
     });
+
+    // Make sure the builder itself is a Promise
+    builder[Symbol.toStringTag] = 'Promise';
+
+    // Override then to handle the data structure correctly
+    builder.then = (resolve: any) => {
+        if (typeof resolve === 'function') {
+            // When used as a Promise, return just the data
+            return Promise.resolve(finalResponse.data).then(resolve);
+        }
+        return Promise.resolve(finalResponse.data);
+    };
+
+    // Override catch to maintain the chain
+    builder.catch = (reject: any) => {
+        if (typeof reject === 'function' && finalResponse.error) {
+            return Promise.reject(finalResponse.error).catch(reject);
+        }
+        return builder;
+    };
+
+    // Override single to return the response directly
+    builder.single = () => {
+        if (finalResponse.error) {
+            return Promise.reject(finalResponse.error);
+        }
+        return Promise.resolve(finalResponse.data);
+    };
 
     return builder;
 };
@@ -98,6 +125,7 @@ describe('useTickets', () => {
         expect(result.current.tickets).toEqual(mockTickets);
         expect(result.current.error).toBeNull();
         expect(supabaseMock.select).toHaveBeenCalledWith('*, assignee:assigned_to(id, email), creator:created_by(id, email), team:team_id(id, name)');
+        expect(supabaseMock.order).toHaveBeenCalledWith('created_at', { ascending: false });
     });
 
     it('should apply filters correctly', async () => {
@@ -130,11 +158,17 @@ describe('useTickets', () => {
             description: 'New Description',
             status: TicketStatus.New,
             priority: PriorityLevel.Medium,
-            created_by: 'user1',
-            team_id: 'team1'
+            customer_user_id: '11111111-1111-1111-1111-111111111111',
+            team_id: '33333333-3333-3333-3333-333333333333'
         };
 
-        const mockResponse = { data: { ...newTicket, id: '3' }, error: null };
+        const mockResponse = {
+            data: {
+                ...newTicket,
+                id: '88888888-8888-8888-8888-888888888888'
+            },
+            error: null
+        };
         const supabaseMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(supabaseMock);
 
@@ -150,7 +184,7 @@ describe('useTickets', () => {
 
     it('should update ticket successfully', async () => {
         const updates = {
-            id: '1',
+            id: '44444444-4444-4444-4444-444444444444',
             subject: 'Updated Ticket',
             status: TicketStatus.Open
         };
@@ -178,11 +212,11 @@ describe('useTickets', () => {
         const { result } = renderHook(() => useTickets(), { wrapper });
 
         await act(async () => {
-            await result.current.deleteTicket.mutateAsync('1');
+            await result.current.deleteTicket.mutateAsync('44444444-4444-4444-4444-444444444444');
         });
 
         expect(supabaseMock.delete).toHaveBeenCalled();
-        expect(supabaseMock.eq).toHaveBeenCalledWith('id', '1');
+        expect(supabaseMock.eq).toHaveBeenCalledWith('id', '44444444-4444-4444-4444-444444444444');
     });
 
     it('should handle fetch error', async () => {

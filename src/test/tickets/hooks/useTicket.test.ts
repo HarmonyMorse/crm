@@ -35,6 +35,21 @@ const createSupabaseMock = (finalResponse: any) => {
         }
     });
 
+    // Override then to return the final response
+    builder.then = vi.fn().mockImplementation((callback) => {
+        return Promise.resolve(finalResponse).then(callback);
+    });
+
+    // Override single to return the final response
+    builder.single = vi.fn().mockImplementation(() => {
+        return Promise.resolve(finalResponse);
+    });
+
+    // Make sure the builder itself is a Promise
+    builder[Symbol.toStringTag] = 'Promise';
+    builder.then = (resolve: any) => Promise.resolve(finalResponse).then(resolve);
+    builder.catch = () => Promise.resolve(finalResponse);
+
     return builder;
 };
 
@@ -99,27 +114,29 @@ describe('useTicket', () => {
         const supabaseMock = createSupabaseMock({ data: mockTicket, error: null });
         (supabase.from as any).mockReturnValue(supabaseMock);
 
-        const { result } = renderHook(() => useTicket('1'), { wrapper });
+        const { result } = renderHook(() => useTicket('44444444-4444-4444-4444-444444444444'), { wrapper });
 
         await waitFor(() => !result.current.isLoading);
 
         expect(result.current.ticket).toEqual(mockTicket);
         expect(result.current.error).toBeNull();
         expect(supabaseMock.select).toHaveBeenCalledWith('*, assignee:assigned_to(id, email), creator:created_by(id, email), team:team_id(id, name)');
-        expect(supabaseMock.eq).toHaveBeenCalledWith('id', '1');
+        expect(supabaseMock.eq).toHaveBeenCalledWith('id', '44444444-4444-4444-4444-444444444444');
+        expect(supabaseMock.single).toHaveBeenCalled();
     });
 
     it('should fetch comments successfully', async () => {
         const commentsMock = createSupabaseMock({ data: mockComments, error: null });
         (supabase.from as any).mockReturnValue(commentsMock);
 
-        const { result } = renderHook(() => useTicket('1'), { wrapper });
+        const { result } = renderHook(() => useTicket('44444444-4444-4444-4444-444444444444'), { wrapper });
 
         await waitFor(() => !result.current.isLoadingComments);
 
         expect(result.current.comments).toEqual(mockComments);
         expect(commentsMock.select).toHaveBeenCalledWith('*, creator:created_by(id, email)');
-        expect(commentsMock.eq).toHaveBeenCalledWith('ticket_id', '1');
+        expect(commentsMock.eq).toHaveBeenCalledWith('ticket_id', '44444444-4444-4444-4444-444444444444');
+        expect(commentsMock.order).toHaveBeenCalledWith('created_at', { ascending: true });
     });
 
     it('should handle fetch error', async () => {
@@ -127,7 +144,7 @@ describe('useTicket', () => {
         const supabaseMock = createSupabaseMock({ data: null, error: mockError });
         (supabase.from as any).mockReturnValue(supabaseMock);
 
-        const { result } = renderHook(() => useTicket('1'), { wrapper });
+        const { result } = renderHook(() => useTicket('44444444-4444-4444-4444-444444444444'), { wrapper });
 
         await waitFor(() => !result.current.isLoading);
 
@@ -139,26 +156,33 @@ describe('useTicket', () => {
         const newComment = {
             content: 'New Comment',
             is_internal: false,
-            created_by: 'user1'
+            user_id: '11111111-1111-1111-1111-111111111111'
         };
 
-        const mockResponse = { data: { ...newComment, id: '3', ticket_id: '1' }, error: null };
+        const mockResponse = {
+            data: {
+                ...newComment,
+                id: '88888888-8888-8888-8888-888888888888',
+                ticket_id: '44444444-4444-4444-4444-444444444444'
+            },
+            error: null
+        };
         const supabaseMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(supabaseMock);
 
-        const { result } = renderHook(() => useTicket('1'), { wrapper });
+        const { result } = renderHook(() => useTicket('44444444-4444-4444-4444-444444444444'), { wrapper });
 
         await act(async () => {
             await result.current.addComment.mutateAsync(newComment);
         });
 
-        expect(supabaseMock.insert).toHaveBeenCalledWith([{ ...newComment, ticket_id: '1' }]);
+        expect(supabaseMock.insert).toHaveBeenCalledWith([{ ...newComment, ticket_id: '44444444-4444-4444-4444-444444444444' }]);
         expect(supabaseMock.select).toHaveBeenCalledWith('*');
     });
 
     it('should update comment successfully', async () => {
         const updates = {
-            id: '1',
+            id: '66666666-6666-6666-6666-666666666666',
             content: 'Updated Comment'
         };
 
@@ -166,7 +190,7 @@ describe('useTicket', () => {
         const supabaseMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(supabaseMock);
 
-        const { result } = renderHook(() => useTicket('1'), { wrapper });
+        const { result } = renderHook(() => useTicket('44444444-4444-4444-4444-444444444444'), { wrapper });
 
         await act(async () => {
             await result.current.updateComment.mutateAsync(updates);
@@ -182,13 +206,13 @@ describe('useTicket', () => {
         const supabaseMock = createSupabaseMock(mockResponse);
         (supabase.from as any).mockReturnValue(supabaseMock);
 
-        const { result } = renderHook(() => useTicket('1'), { wrapper });
+        const { result } = renderHook(() => useTicket('44444444-4444-4444-4444-444444444444'), { wrapper });
 
         await act(async () => {
-            await result.current.deleteComment.mutateAsync('1');
+            await result.current.deleteComment.mutateAsync('66666666-6666-6666-6666-666666666666');
         });
 
         expect(supabaseMock.delete).toHaveBeenCalled();
-        expect(supabaseMock.eq).toHaveBeenCalledWith('id', '1');
+        expect(supabaseMock.eq).toHaveBeenCalledWith('id', '66666666-6666-6666-6666-666666666666');
     });
 }); 
