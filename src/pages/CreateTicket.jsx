@@ -7,10 +7,7 @@ function CreateTicket() {
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         subject: '',
-        description: '',
-        priority: 'medium',
-        category_id: null,
-        tags: []
+        description: ''
     });
     const [error, setError] = useState(null);
 
@@ -36,31 +33,29 @@ function CreateTicket() {
                 throw new Error('You must be logged in to create a ticket');
             }
 
+            console.log('Attempting to create ticket with user:', user.id);
+
             // Create the ticket with schema-compliant data
-            const { error: insertError, data } = await supabase
+            const { data, error: insertError } = await supabase
                 .from('tickets')
-                .insert([
-                    {
-                        subject: formData.subject,
-                        description: formData.description,
-                        priority: formData.priority,
-                        status: 'new',
-                        customer_user_id: user.id,
-                        category_id: formData.category_id,
-                        tags: formData.tags,
-                        metadata: {},
-                        custom_fields: {}
-                    }
-                ])
-                .select()
+                .insert({
+                    subject: formData.subject,
+                    description: formData.description || null,
+                    user_id: user.id
+                })
+                .select('*')
                 .single();
 
             if (insertError) {
-                if (insertError.code === '23514') { // Check constraint violation
-                    throw new Error('Subject must be at least 3 characters long');
-                }
+                console.error('Insert error details:', {
+                    message: insertError.message,
+                    details: insertError.details,
+                    hint: insertError.hint
+                });
                 throw insertError;
             }
+
+            console.log('Successfully created ticket:', data);
 
             // Redirect to the dashboard
             navigate('/dashboard');
@@ -106,7 +101,6 @@ function CreateTicket() {
                         value={formData.subject}
                         onChange={handleChange}
                         required
-                        minLength={3}
                         style={{
                             width: '100%',
                             padding: '8px',
@@ -133,29 +127,6 @@ function CreateTicket() {
                             border: '1px solid #ccc'
                         }}
                     />
-                </div>
-
-                <div style={{ marginBottom: '20px' }}>
-                    <label htmlFor="priority" style={{ display: 'block', marginBottom: '8px' }}>
-                        Priority
-                    </label>
-                    <select
-                        id="priority"
-                        name="priority"
-                        value={formData.priority}
-                        onChange={handleChange}
-                        style={{
-                            width: '100%',
-                            padding: '8px',
-                            borderRadius: '4px',
-                            border: '1px solid #ccc'
-                        }}
-                    >
-                        <option value="low">Low</option>
-                        <option value="medium">Medium</option>
-                        <option value="high">High</option>
-                        <option value="urgent">Urgent</option>
-                    </select>
                 </div>
 
                 <button
