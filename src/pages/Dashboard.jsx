@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useNavigate } from 'react-router-dom'
-import TicketList from '../components/TicketList'
+import TicketList from '../components/tickets/TicketList'
 import { Button } from '../components/ui/button'
 
 function Dashboard() {
