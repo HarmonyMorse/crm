@@ -4,6 +4,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import AuthComponent from './Auth.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import CreateTicket from './pages/CreateTicket.jsx'
+import TicketDetail from './components/tickets/TicketDetail'
+
 function App() {
   const [session, setSession] = useState(null)
 
@@ -23,15 +25,22 @@ function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  if (!session) {
+    return <AuthComponent />
+  }
+
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={
-          session ? <Navigate to="/dashboard" /> : <AuthComponent />
-        } />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/create-ticket" element={<CreateTicket />} />
-      </Routes>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto py-8">
+          <Routes>
+            <Route path="/" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/tickets/create" element={<CreateTicket />} />
+            <Route path="/tickets/:id" element={<TicketDetail />} />
+          </Routes>
+        </div>
+      </div>
     </Router>
   )
 }
