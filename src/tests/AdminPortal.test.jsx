@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitForElementToBeRemoved } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { describe, it, expect, vi } from 'vitest'
 import AdminPortal from '../pages/AdminPortal'
@@ -12,6 +12,7 @@ vi.mock('../lib/supabaseClient', () => ({
         from: vi.fn(() => ({
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnValue({ data: [], error: null }),
             single: vi.fn(),
         })),
     },
@@ -33,13 +34,18 @@ describe('AdminPortal', () => {
         expect(screen.getByRole('tab', { name: /agents/i })).toBeInTheDocument()
     })
 
-    it('shows team management section by default', () => {
+    it('shows team management section by default', async () => {
         render(
             <BrowserRouter>
                 <AdminPortal />
             </BrowserRouter>
         )
 
-        expect(screen.getByText('Team Management')).toBeInTheDocument()
+        // Wait for loading state to finish
+        await waitForElementToBeRemoved(() => screen.queryByText(/loading/i))
+
+        // Check for team name input
+        expect(screen.getByLabelText(/team name/i)).toBeInTheDocument()
+        expect(screen.getByPlaceholderText(/enter team name/i)).toBeInTheDocument()
     })
 }) 
