@@ -1,5 +1,6 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs"
-import { Card } from "../components/ui/card"
+import TeamManagement from "../components/admin/TeamManagement"
+import AgentAssignment from "../components/admin/AgentAssignment"
 
 export default function AdminPortal() {
     return (
@@ -13,19 +14,11 @@ export default function AdminPortal() {
                 </TabsList>
 
                 <TabsContent value="teams">
-                    <Card className="p-6">
-                        <h2 className="text-2xl font-semibold mb-4">Team Management</h2>
-                        {/* TeamManagement component will go here */}
-                        <p className="text-muted-foreground">Team management interface coming soon...</p>
-                    </Card>
+                    <TeamManagement />
                 </TabsContent>
 
                 <TabsContent value="agents">
-                    <Card className="p-6">
-                        <h2 className="text-2xl font-semibold mb-4">Agent Assignment</h2>
-                        {/* AgentAssignment component will go here */}
-                        <p className="text-muted-foreground">Agent assignment interface coming soon...</p>
-                    </Card>
+                    <AgentAssignment />
                 </TabsContent>
             </Tabs>
         </div>
