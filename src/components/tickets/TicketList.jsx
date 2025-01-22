@@ -1,86 +1,215 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
+import { Button } from '../ui/button';
+
+const PRIORITY_COLORS = {
+    high: 'text-red-400',
+    medium: 'text-yellow-400',
+    low: 'text-green-400'
+};
+
+const STATUS_COLORS = {
+    open: 'bg-green-500/10 text-green-400',
+    pending: 'bg-yellow-500/10 text-yellow-400',
+    resolved: 'bg-blue-500/10 text-blue-400'
+};
 
 function TicketList() {
+    const navigate = useNavigate();
     const [tickets, setTickets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [sortField, setSortField] = useState('created_at');
+    const [sortDirection, setSortDirection] = useState('desc');
+    const [userRole, setUserRole] = useState(null);
 
+    // Fetch user role and tickets
     useEffect(() => {
-        fetchTickets();
-    }, []);
+        const fetchUserRoleAndTickets = async () => {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (!user) throw new Error('Not authenticated');
 
-    const fetchTickets = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('tickets')
-                .select('*')
-                .order('created_at', { ascending: false });
+                // Get user role
+                const { data: userData, error: userError } = await supabase
+                    .from('users')
+                    .select('role')
+                    .eq('id', user.id)
+                    .single();
 
-            if (error) {
-                throw error;
+                if (userError) throw userError;
+                setUserRole(userData.role);
+
+                // Fetch tickets based on role
+                let query = supabase
+                    .from('tickets')
+                    .select(`
+                        *,
+                        customer:users!tickets_customer_id_fkey(
+                            email,
+                            name
+                        )
+                    `)
+                    .order(sortField, { ascending: sortDirection === 'asc' });
+
+                // If user is a customer, only show their tickets
+                if (userData.role === 'customer') {
+                    query = query.eq('customer_id', user.id);
+                }
+
+                const { data: ticketsData, error: ticketsError } = await query;
+
+                if (ticketsError) throw ticketsError;
+                setTickets(ticketsData);
+            } catch (err) {
+                console.error('Error:', err);
+                setError(err.message);
+            } finally {
+                setLoading(false);
             }
+        };
 
-            setTickets(data);
-        } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
+        fetchUserRoleAndTickets();
+
+        // Set up realtime subscription
+        const channel = supabase
+            .channel('tickets_channel')
+            .on('postgres_changes',
+                {
+                    event: '*',
+                    schema: 'public',
+                    table: 'tickets'
+                },
+                (payload) => {
+                    // Refresh tickets when there's a change
+                    fetchUserRoleAndTickets();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [sortField, sortDirection]);
+
+    const handleSort = (field) => {
+        if (field === sortField) {
+            setSortDirection(current => current === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortField(field);
+            setSortDirection('asc');
         }
     };
 
     if (loading) {
-        return <div>Loading tickets...</div>;
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="text-foreground">Loading tickets...</div>
+            </div>
+        );
     }
 
     if (error) {
-        return <div style={{ color: 'red' }}>Error: {error}</div>;
-    }
-
-    if (tickets.length === 0) {
-        return <div>No tickets found. Create your first ticket!</div>;
+        return (
+            <div className="bg-red-900/20 text-red-400 p-4 rounded-md">
+                Error: {error}
+            </div>
+        );
     }
 
     return (
-        <div>
-            <div style={{ marginBottom: '20px' }}>
-                <h2 style={{ color: '#e0e0e0' }}>Your Tickets</h2>
+        <div className="space-y-4">
+            <div className="flex justify-between items-center">
+                <h2 className="text-2xl font-bold text-foreground">Tickets</h2>
+                <Button
+                    onClick={() => navigate('/tickets/create')}
+                    variant="default"
+                >
+                    Create Ticket
+                </Button>
             </div>
-            <div style={{ display: 'grid', gap: '16px' }}>
-                {tickets.map((ticket) => (
-                    <div
-                        key={ticket.id}
-                        style={{
-                            padding: '16px',
-                            border: '1px solid #333',
-                            borderRadius: '8px',
-                            backgroundColor: '#1e1e1e'
-                        }}
-                    >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h3 style={{ margin: '0', fontSize: '1.1rem', color: '#e0e0e0' }}>{ticket.subject}</h3>
-                            <span
-                                style={{
-                                    padding: '4px 8px',
-                                    borderRadius: '4px',
-                                    backgroundColor: ticket.status === 'new' ? '#1a365d' : '#1b4332',
-                                    color: ticket.status === 'new' ? '#90cdf4' : '#90edb3',
-                                    fontSize: '0.875rem'
-                                }}
+
+            <div className="border border-border rounded-md overflow-x-auto">
+                <table className="w-full">
+                    <thead>
+                        <tr className="border-b border-border bg-muted/50">
+                            <th
+                                className="px-4 py-2 text-left text-foreground cursor-pointer hover:bg-muted"
+                                onClick={() => handleSort('title')}
                             >
-                                {ticket.status}
-                            </span>
-                        </div>
-                        {ticket.description && (
-                            <p style={{ margin: '8px 0', color: '#9e9e9e' }}>
-                                {ticket.description}
-                            </p>
-                        )}
-                        <div style={{ fontSize: '0.875rem', color: '#757575', marginTop: '8px' }}>
-                            Created: {new Date(ticket.created_at).toLocaleDateString()}
-                        </div>
-                    </div>
-                ))}
+                                Title {sortField === 'title' && (sortDirection === 'asc' ? '↑' : '↓')}
+                            </th>
+                            {userRole !== 'customer' && (
+                                <th
+                                    className="px-4 py-2 text-left text-foreground"
+                                >
+                                    Customer
+                                </th>
+                            )}
+                            <th
+                                className="px-4 py-2 text-left text-foreground cursor-pointer hover:bg-muted"
+                                onClick={() => handleSort('status')}
+                            >
+                                Status {sortField === 'status' && (sortDirection === 'asc' ? '↑' : '↓')}
+                            </th>
+                            <th
+                                className="px-4 py-2 text-left text-foreground cursor-pointer hover:bg-muted"
+                                onClick={() => handleSort('priority')}
+                            >
+                                Priority {sortField === 'priority' && (sortDirection === 'asc' ? '↑' : '↓')}
+                            </th>
+                            <th
+                                className="px-4 py-2 text-left text-foreground cursor-pointer hover:bg-muted"
+                                onClick={() => handleSort('created_at')}
+                            >
+                                Created {sortField === 'created_at' && (sortDirection === 'asc' ? '↑' : '↓')}
+                            </th>
+                            <th className="px-4 py-2 text-left text-foreground">
+                                Actions
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {tickets.map(ticket => (
+                            <tr
+                                key={ticket.id}
+                                className="border-b border-border hover:bg-muted/50"
+                            >
+                                <td className="px-4 py-2 text-foreground">
+                                    {ticket.title}
+                                </td>
+                                {userRole !== 'customer' && (
+                                    <td className="px-4 py-2 text-foreground">
+                                        {ticket.customer.name || ticket.customer.email}
+                                    </td>
+                                )}
+                                <td className="px-4 py-2">
+                                    <span className={`px-2 py-1 rounded-full text-xs ${STATUS_COLORS[ticket.status]}`}>
+                                        {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-2">
+                                    <span className={PRIORITY_COLORS[ticket.priority]}>
+                                        {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
+                                    </span>
+                                </td>
+                                <td className="px-4 py-2 text-foreground">
+                                    {new Date(ticket.created_at).toLocaleDateString()}
+                                </td>
+                                <td className="px-4 py-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => navigate(`/tickets/${ticket.id}`)}
+                                    >
+                                        View
+                                    </Button>
+                                </td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
             </div>
         </div>
     );
