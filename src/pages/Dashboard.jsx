@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { useNavigate } from 'react-router-dom'
 import TicketList from '../components/TicketList'
+import { Button } from '../components/ui/button'
 
 function Dashboard() {
     const navigate = useNavigate()
@@ -19,19 +20,12 @@ function Dashboard() {
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
                 <h1 style={{ margin: 0 }}>Dashboard</h1>
-                <button
+                <Button
                     onClick={() => navigate('/create-ticket')}
-                    style={{
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        padding: '10px 20px',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                    }}
+                    variant="default"
                 >
                     Create Ticket
-                </button>
+                </Button>
             </div>
             <TicketList />
         </div>

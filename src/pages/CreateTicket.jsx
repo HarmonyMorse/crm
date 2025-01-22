@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
+import { Button } from '../components/ui/button';
 
 function CreateTicket() {
     const navigate = useNavigate();
@@ -70,17 +71,12 @@ function CreateTicket() {
         <div style={{ maxWidth: '600px', margin: '0 auto', padding: '20px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                 <h1>Create New Ticket</h1>
-                <button
+                <Button
+                    variant="outline"
                     onClick={() => navigate('/dashboard')}
-                    style={{
-                        padding: '8px 16px',
-                        border: '1px solid #ccc',
-                        borderRadius: '4px',
-                        cursor: 'pointer'
-                    }}
                 >
                     Back
-                </button>
+                </Button>
             </div>
 
             {error && (
@@ -129,21 +125,13 @@ function CreateTicket() {
                     />
                 </div>
 
-                <button
+                <Button
                     type="submit"
                     disabled={isSubmitting}
-                    style={{
-                        backgroundColor: '#4CAF50',
-                        color: 'white',
-                        padding: '10px 20px',
-                        border: 'none',
-                        borderRadius: '4px',
-                        cursor: isSubmitting ? 'not-allowed' : 'pointer',
-                        opacity: isSubmitting ? 0.7 : 1
-                    }}
+                    variant="default"
                 >
                     {isSubmitting ? 'Creating...' : 'Create Ticket'}
-                </button>
+                </Button>
             </form>
         </div>
     );
