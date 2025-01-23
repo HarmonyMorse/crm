@@ -2,14 +2,13 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabaseClient'
 import { Button } from '../ui/button'
 import { Card, CardContent } from '../ui/card'
-import { Input } from '../ui/input'
 
 export default function AgentAssignment() {
     const [teams, setTeams] = useState([])
     const [agents, setAgents] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
-    const [newAgentEmail, setNewAgentEmail] = useState('')
+    const [selectedAgent, setSelectedAgent] = useState('')
     const [selectedTeam, setSelectedTeam] = useState('')
 
     useEffect(() => {
@@ -22,16 +21,16 @@ export default function AgentAssignment() {
             const { data, error } = await supabase
                 .from('teams')
                 .select(`
-          id,
-          name,
-          team_members (
-            user:users (
-              id,
-              name,
-              email
-            )
-          )
-        `)
+                    id,
+                    name,
+                    team_members (
+                        user:users (
+                            id,
+                            name,
+                            email
+                        )
+                    )
+                `)
                 .order('name')
 
             if (error) throw error
@@ -58,57 +57,41 @@ export default function AgentAssignment() {
         }
     }
 
-    async function createAgent(e) {
+    async function assignToTeam(e) {
         e.preventDefault()
-        if (!newAgentEmail.trim() || !selectedTeam) return
+        if (!selectedAgent || !selectedTeam) return
 
         try {
-            // First create the user with agent role
-            const { data: userData, error: userError } = await supabase
+            // Check if agent is already in the team
+            const team = teams.find(t => t.id === selectedTeam)
+            if (team.team_members.some(tm => tm.user.id === selectedAgent)) {
+                setError('Agent is already assigned to this team')
+                return
+            }
+
+            // First update the user's role to agent if they aren't already
+            const { error: roleError } = await supabase
                 .from('users')
-                .insert([{
-                    email: newAgentEmail.trim(),
-                    role: 'agent',
-                    name: newAgentEmail.split('@')[0] // Temporary name from email
-                }])
-                .select()
-                .single()
+                .update({ role: 'agent' })
+                .eq('id', selectedAgent)
 
-            if (userError) throw userError
+            if (roleError) throw roleError
 
-            // Then assign them to the selected team
+            // Then assign them to the team
             const { error: teamError } = await supabase
                 .from('team_members')
                 .insert([{
                     team_id: selectedTeam,
-                    user_id: userData.id
+                    user_id: selectedAgent
                 }])
 
             if (teamError) throw teamError
 
             // Refresh data
             await Promise.all([fetchTeams(), fetchAgents()])
-            setNewAgentEmail('')
+            setSelectedAgent('')
             setSelectedTeam('')
-        } catch (err) {
-            setError(err.message === 'duplicate key value violates unique constraint "users_email_key"'
-                ? 'An agent with this email already exists'
-                : 'Failed to create agent')
-            console.error('Error creating agent:', err)
-        }
-    }
-
-    async function assignToTeam(agentId, teamId) {
-        try {
-            const { error } = await supabase
-                .from('team_members')
-                .insert([{
-                    team_id: teamId,
-                    user_id: agentId
-                }])
-
-            if (error) throw error
-            await fetchTeams()
+            setError(null)
         } catch (err) {
             setError('Failed to assign agent to team')
             console.error('Error assigning agent:', err)
@@ -121,22 +104,28 @@ export default function AgentAssignment() {
 
     return (
         <div className="space-y-6">
-            <form onSubmit={createAgent} className="space-y-4">
+            <form onSubmit={assignToTeam} className="space-y-4">
                 <div>
-                    <label htmlFor="agentEmail" className="block text-sm font-medium mb-2">
-                        New Agent Email
+                    <label htmlFor="agentSelect" className="block text-sm font-medium mb-2">
+                        Select User to Make Agent
                     </label>
-                    <Input
-                        id="agentEmail"
-                        type="email"
-                        value={newAgentEmail}
+                    <select
+                        id="agentSelect"
+                        value={selectedAgent}
                         onChange={(e) => {
                             setError(null)
-                            setNewAgentEmail(e.target.value)
+                            setSelectedAgent(e.target.value)
                         }}
-                        placeholder="agent@example.com"
+                        className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         required
-                    />
+                    >
+                        <option value="">Select a user</option>
+                        {agents.map((agent) => (
+                            <option key={agent.id} value={agent.id}>
+                                {agent.name || agent.email}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
                 <div>
@@ -146,7 +135,10 @@ export default function AgentAssignment() {
                     <select
                         id="teamSelect"
                         value={selectedTeam}
-                        onChange={(e) => setSelectedTeam(e.target.value)}
+                        onChange={(e) => {
+                            setError(null)
+                            setSelectedTeam(e.target.value)
+                        }}
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         required
                     >
@@ -160,7 +152,7 @@ export default function AgentAssignment() {
                 </div>
 
                 {error && <p className="text-sm text-red-500">{error}</p>}
-                <Button type="submit">Create Agent</Button>
+                <Button type="submit">Assign to Team</Button>
             </form>
 
             <div className="grid gap-4">
@@ -171,7 +163,7 @@ export default function AgentAssignment() {
                             <div className="space-y-2">
                                 {team.team_members.map(({ user }) => (
                                     <div key={user.id} className="text-sm">
-                                        {user.name} ({user.email})
+                                        {user.name || user.email}
                                     </div>
                                 ))}
                                 {team.team_members.length === 0 && (

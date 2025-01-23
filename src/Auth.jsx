@@ -17,31 +17,22 @@ export default function AuthComponent() {
         } = supabase.auth.onAuthStateChange(async (_event, session) => {
             setSession(session)
 
-            // If this is a new sign up, create a user record
+            // When a user signs up or signs in, create/verify their database record
             if (_event === 'SIGNED_IN' && session) {
                 try {
-                    // Check if user already exists in public.users
-                    const { data: existingUser } = await supabase
+                    // Create or update the user record in our database
+                    const { error: upsertError } = await supabase
                         .from('users')
-                        .select('id')
-                        .eq('id', session.user.id)
-                        .single()
+                        .upsert({
+                            id: session.user.id,
+                            email: session.user.email,
+                            name: session.user.user_metadata?.name || session.user.email.split('@')[0],
+                            role: 'customer' // All new signups are customers by default
+                        })
 
-                    if (!existingUser) {
-                        // Create new user record
-                        const { error: insertError } = await supabase
-                            .from('users')
-                            .insert([{
-                                id: session.user.id,
-                                email: session.user.email,
-                                name: session.user.user_metadata?.name || session.user.email.split('@')[0],
-                                role: 'customer' // Default role for new signups
-                            }])
-
-                        if (insertError) {
-                            console.error('Error creating user record:', insertError)
-                            setError('Failed to complete signup. Please try again.')
-                        }
+                    if (upsertError) {
+                        console.error('Error upserting user:', upsertError)
+                        setError('Failed to complete signup. Please try again.')
                     }
                 } catch (err) {
                     console.error('Error in auth state change:', err)
@@ -53,8 +44,6 @@ export default function AuthComponent() {
         return () => subscription.unsubscribe()
     }, [])
 
-    // If you prefer a fully custom UI, you can create your own forms for sign in/sign up.
-    // For demonstration, we'll use the Supabase UI components here.
     return (
         <div>
             {error && (
@@ -66,7 +55,7 @@ export default function AuthComponent() {
                 <Auth
                     supabaseClient={supabase}
                     appearance={{ theme: ThemeSupa }}
-                    providers={[]}  // Optional: remove or add as needed
+                    providers={[]}
                 />
             ) : (
                 <button onClick={() => supabase.auth.signOut()}>Sign Out</button>
