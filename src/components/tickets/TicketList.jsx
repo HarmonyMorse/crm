@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/button';
+import { Check, Copy } from 'lucide-react';
 
 const PRIORITY_COLORS = {
     high: 'text-red-400',
@@ -23,6 +24,7 @@ function TicketList() {
     const [sortField, setSortField] = useState('created_at');
     const [sortDirection, setSortDirection] = useState('desc');
     const [userRole, setUserRole] = useState(null);
+    const [copiedId, setCopiedId] = useState(null);
 
     // Fetch user role and tickets
     useEffect(() => {
@@ -81,7 +83,7 @@ function TicketList() {
                     schema: 'public',
                     table: 'tickets'
                 },
-                (payload) => {
+                () => {
                     // Refresh tickets when there's a change
                     fetchUserRoleAndTickets();
                 }
@@ -99,6 +101,16 @@ function TicketList() {
         } else {
             setSortField(field);
             setSortDirection('asc');
+        }
+    };
+
+    const handleCopyId = async (id) => {
+        try {
+            await navigator.clipboard.writeText(id);
+            setCopiedId(id);
+            setTimeout(() => setCopiedId(null), 2000);
+        } catch (err) {
+            console.error('Failed to copy:', err);
         }
     };
 
@@ -134,6 +146,9 @@ function TicketList() {
                 <table className="w-full">
                     <thead>
                         <tr className="border-b border-border bg-muted/50">
+                            <th className="px-4 py-2 text-left text-foreground">
+                                ID
+                            </th>
                             <th
                                 className="px-4 py-2 text-left text-foreground cursor-pointer hover:bg-muted"
                                 onClick={() => handleSort('title')}
@@ -176,6 +191,20 @@ function TicketList() {
                                 key={ticket.id}
                                 className="border-b border-border hover:bg-muted/50"
                             >
+                                <td className="px-4 py-2 text-foreground">
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 w-8 p-0"
+                                        onClick={() => handleCopyId(ticket.id)}
+                                    >
+                                        {copiedId === ticket.id ? (
+                                            <Check className="h-4 w-4 text-green-500" />
+                                        ) : (
+                                            <Copy className="h-4 w-4" />
+                                        )}
+                                    </Button>
+                                </td>
                                 <td className="px-4 py-2 text-foreground">
                                     {ticket.title}
                                 </td>
