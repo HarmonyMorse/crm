@@ -55,6 +55,20 @@ describe('TicketList', () => {
         supabase.auth.getUser.mockResolvedValue({
             data: { user: { id: 'test-user-id' } }
         });
+
+        vi.spyOn(supabase, 'from').mockImplementation(() => ({
+            select: () => ({
+                eq: () => ({
+                    order: () => Promise.resolve({ data: mockTickets, error: null })
+                }),
+                order: () => Promise.resolve({ data: mockTickets, error: null })
+            })
+        }));
+
+        vi.spyOn(supabase, 'channel').mockReturnValue({
+            on: vi.fn().mockReturnThis(),
+            subscribe: vi.fn().mockResolvedValue()
+        });
     });
 
     it('shows loading state initially', async () => {

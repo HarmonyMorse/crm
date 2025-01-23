@@ -270,7 +270,7 @@ describe('TicketDetail', () => {
         });
 
         // Change status
-        const pendingButton = screen.getByRole('button', { name: /mark pending/i });
+        const pendingButton = screen.getByRole('button', { name: /pending/i });
         fireEvent.click(pendingButton);
 
         await waitFor(() => {
@@ -327,17 +327,18 @@ describe('TicketDetail', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByPlaceholderText(/add a comment/i)).toBeInTheDocument();
+            expect(screen.getByText(/Test Ticket/)).toBeInTheDocument();
         });
 
         // Add comment
         const commentInput = screen.getByPlaceholderText(/add a comment/i);
         fireEvent.change(commentInput, { target: { value: 'New comment' } });
-        fireEvent.submit(commentInput.closest('form'));
+        const form = commentInput.closest('form');
+        fireEvent.submit(form);
 
         await waitFor(() => {
             expect(mockHistoryInsertQuery.insert).toHaveBeenCalledWith({
-                ticket_id: 1,
+                ticket_id: mockTicket.id,
                 user_id: 'test-user-id',
                 message: 'New comment',
                 message_type: 'customer'
@@ -346,12 +347,14 @@ describe('TicketDetail', () => {
     });
 
     it('displays error message when fetching fails', async () => {
-        // Mock error response
-        supabase.from.mockReturnValue({
-            select: vi.fn().mockReturnThis(),
-            eq: vi.fn().mockReturnThis(),
-            single: vi.fn().mockRejectedValue(new Error('Failed to fetch'))
-        });
+        const mockError = new Error('Failed to fetch');
+        vi.spyOn(supabase, 'from').mockImplementation(() => ({
+            select: () => ({
+                eq: () => ({
+                    single: () => Promise.reject(mockError)
+                })
+            })
+        }));
 
         render(
             <BrowserRouter>
@@ -360,7 +363,10 @@ describe('TicketDetail', () => {
         );
 
         await waitFor(() => {
-            expect(screen.getByText('Error: Failed to fetch')).toBeInTheDocument();
+            const errorElement = screen.getByText((content, element) => {
+                return element.className.includes('bg-red-900/20') && element.textContent === 'Error: Failed to fetch';
+            });
+            expect(errorElement).toBeInTheDocument();
         });
     });
 
