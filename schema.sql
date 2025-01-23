@@ -45,15 +45,17 @@ CREATE TABLE tickets (
   priority ticket_priority NOT NULL DEFAULT 'low',
   title TEXT NOT NULL,
   description TEXT,
-  customer_id UUID NOT NULL REFERENCES users(id),
+  customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  assigned_agent_id UUID REFERENCES users(id) ON DELETE SET NULL,
+  assigned_team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
   tags TEXT[]
 );
 
 -- Create team_members table
 CREATE TABLE team_members (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  team_id UUID NOT NULL REFERENCES teams(id),
-  user_id UUID NOT NULL REFERENCES users(id),
+  team_id UUID NOT NULL REFERENCES teams(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   UNIQUE(team_id, user_id)
 );
 
@@ -79,6 +81,8 @@ CREATE TABLE ticket_history (
 -- Add indexes for common queries
 CREATE INDEX idx_tickets_customer_id ON tickets(customer_id);
 CREATE INDEX idx_tickets_status ON tickets(status);
+CREATE INDEX idx_tickets_assigned_agent_id ON tickets(assigned_agent_id);
+CREATE INDEX idx_tickets_assigned_team_id ON tickets(assigned_team_id);
 CREATE INDEX idx_ticket_history_ticket_id ON ticket_history(ticket_id);
 CREATE INDEX idx_notes_ticket_id ON notes(ticket_id);
 CREATE INDEX idx_team_members_team_id ON team_members(team_id);
@@ -216,5 +220,78 @@ CREATE POLICY team_members_admin_all ON team_members
       SELECT 1 FROM users u 
       WHERE u.id = auth.uid() 
       AND u.role IN ('admin', 'agent')
+    )
+  );
+
+-- Teams table policies
+CREATE POLICY teams_select_all ON teams
+  FOR SELECT USING (true);
+
+CREATE POLICY teams_insert_admin ON teams
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users u 
+      WHERE u.id = auth.uid() 
+      AND u.role = 'admin'
+    )
+  );
+
+CREATE POLICY teams_update_admin ON teams
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM users u 
+      WHERE u.id = auth.uid() 
+      AND u.role = 'admin'
+    )
+  );
+
+CREATE POLICY teams_delete_admin ON teams
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM users u 
+      WHERE u.id = auth.uid() 
+      AND u.role = 'admin'
+    )
+  );
+
+-- Team members policies
+CREATE POLICY team_members_select_all ON team_members
+  FOR SELECT USING (true);
+
+CREATE POLICY team_members_insert_admin ON team_members
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM users u 
+      WHERE u.id = auth.uid() 
+      AND u.role = 'admin'
+    )
+  );
+
+CREATE POLICY team_members_delete_admin ON team_members
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM users u 
+      WHERE u.id = auth.uid() 
+      AND u.role = 'admin'
+    )
+  );
+
+-- Update tickets policies to include team assignment
+CREATE POLICY tickets_update_assigned ON tickets
+  FOR UPDATE USING (
+    EXISTS (
+      SELECT 1 FROM users u 
+      WHERE u.id = auth.uid() 
+      AND (
+        u.role = 'admin' OR
+        (u.role = 'agent' AND (
+          u.id = assigned_agent_id OR
+          EXISTS (
+            SELECT 1 FROM team_members tm
+            WHERE tm.user_id = u.id
+            AND tm.team_id = assigned_team_id
+          )
+        ))
+      )
     )
   );

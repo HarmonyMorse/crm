@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/button';
+import AgentAssignment from './AgentAssignment';
 
 const PRIORITY_COLORS = {
     high: 'text-red-400',
@@ -52,6 +53,13 @@ function TicketDetail() {
                         *,
                         customer:users!tickets_customer_id_fkey(
                             email,
+                            name
+                        ),
+                        assigned_agent:users!tickets_assigned_agent_id_fkey(
+                            email,
+                            name
+                        ),
+                        assigned_team:teams!tickets_assigned_team_id_fkey(
                             name
                         )
                     `)
@@ -248,47 +256,75 @@ function TicketDetail() {
             {/* Header */}
             <div className="flex justify-between items-start">
                 <div>
-                    <div className="flex items-center gap-4">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => navigate('/dashboard')}
-                        >
-                            Back
-                        </Button>
-                        <h1 className="text-2xl font-bold text-foreground">{ticket.title}</h1>
-                    </div>
-                    <div className="mt-2 text-muted-foreground">
-                        Opened by {ticket.customer.name || ticket.customer.email} on {new Date(ticket.created_at).toLocaleDateString()}
+                    <h1 className="text-2xl font-bold text-foreground mb-2">
+                        {ticket.title}
+                    </h1>
+                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                        <span>
+                            Opened by: {ticket.customer.name || ticket.customer.email}
+                        </span>
+                        <span>
+                            Created: {new Date(ticket.created_at).toLocaleDateString()}
+                        </span>
                     </div>
                 </div>
-                {userRole !== 'customer' && (
+                <Button variant="outline" onClick={() => navigate('/tickets')}>
+                    Back to Tickets
+                </Button>
+            </div>
+
+            {/* Priority and Tags */}
+            <div className="flex gap-4 text-sm">
+                <span className={PRIORITY_COLORS[ticket.priority]}>
+                    Priority: {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
+                </span>
+                {(ticket.assigned_agent || ticket.assigned_team) && (
+                    <span className="text-muted-foreground">
+                        Assigned to: {ticket.assigned_agent
+                            ? (ticket.assigned_agent.name || ticket.assigned_agent.email)
+                            : `Team ${ticket.assigned_team.name}`}
+                    </span>
+                )}
+            </div>
+
+            {/* Status and Assignment Section */}
+            <div className="grid gap-4 md:grid-cols-2">
+                {/* Status Controls */}
+                <div className="space-y-2">
+                    <label className="text-sm font-medium">Status</label>
                     <div className="flex gap-2">
                         <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={isSubmitting || ticket.status === 'open'}
+                            variant={ticket.status === 'open' ? 'default' : 'outline'}
                             onClick={() => handleStatusChange('open')}
+                            disabled={isSubmitting}
                         >
-                            Mark Open
+                            Open
                         </Button>
                         <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={isSubmitting || ticket.status === 'pending'}
+                            variant={ticket.status === 'pending' ? 'default' : 'outline'}
                             onClick={() => handleStatusChange('pending')}
+                            disabled={isSubmitting}
                         >
-                            Mark Pending
+                            Pending
                         </Button>
                         <Button
-                            variant="default"
-                            size="sm"
-                            disabled={isSubmitting || ticket.status === 'resolved'}
+                            variant={ticket.status === 'resolved' ? 'default' : 'outline'}
                             onClick={() => handleStatusChange('resolved')}
+                            disabled={isSubmitting}
                         >
-                            Resolve
+                            Resolved
                         </Button>
                     </div>
+                </div>
+
+                {/* Agent/Team Assignment */}
+                {userRole === 'admin' && (
+                    <AgentAssignment
+                        ticketId={ticket.id}
+                        currentAgentId={ticket.assigned_agent_id}
+                        currentTeamId={ticket.assigned_team_id}
+                        onAssign={() => { }} // The realtime subscription will handle the update
+                    />
                 )}
             </div>
 
