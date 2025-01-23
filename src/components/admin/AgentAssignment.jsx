@@ -46,14 +46,14 @@ export default function AgentAssignment() {
             const { data, error } = await supabase
                 .from('users')
                 .select('*')
-                .eq('role', 'agent')
+                .neq('role', 'admin')
                 .order('name')
 
             if (error) throw error
             setAgents(data)
         } catch (err) {
-            setError('Failed to fetch agents')
-            console.error('Error fetching agents:', err)
+            setError('Failed to fetch users')
+            console.error('Error fetching users:', err)
         }
     }
 
