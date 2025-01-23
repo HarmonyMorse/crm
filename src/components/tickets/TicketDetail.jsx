@@ -268,8 +268,8 @@ function TicketDetail() {
                         </span>
                     </div>
                 </div>
-                <Button variant="outline" onClick={() => navigate('/tickets')}>
-                    Back to Tickets
+                <Button variant="outline" onClick={() => navigate('/dashboard')}>
+                    Back to Dashboard
                 </Button>
             </div>
 
@@ -292,29 +292,35 @@ function TicketDetail() {
                 {/* Status Controls */}
                 <div className="space-y-2">
                     <label className="text-sm font-medium">Status</label>
-                    <div className="flex gap-2">
-                        <Button
-                            variant={ticket.status === 'open' ? 'default' : 'outline'}
-                            onClick={() => handleStatusChange('open')}
-                            disabled={isSubmitting}
-                        >
-                            Open
-                        </Button>
-                        <Button
-                            variant={ticket.status === 'pending' ? 'default' : 'outline'}
-                            onClick={() => handleStatusChange('pending')}
-                            disabled={isSubmitting}
-                        >
-                            Pending
-                        </Button>
-                        <Button
-                            variant={ticket.status === 'resolved' ? 'default' : 'outline'}
-                            onClick={() => handleStatusChange('resolved')}
-                            disabled={isSubmitting}
-                        >
-                            Resolved
-                        </Button>
-                    </div>
+                    {userRole !== 'customer' ? (
+                        <div className="flex gap-2">
+                            <Button
+                                variant={ticket.status === 'open' ? 'default' : 'outline'}
+                                onClick={() => handleStatusChange('open')}
+                                disabled={isSubmitting}
+                            >
+                                Open
+                            </Button>
+                            <Button
+                                variant={ticket.status === 'pending' ? 'default' : 'outline'}
+                                onClick={() => handleStatusChange('pending')}
+                                disabled={isSubmitting}
+                            >
+                                Pending
+                            </Button>
+                            <Button
+                                variant={ticket.status === 'resolved' ? 'default' : 'outline'}
+                                onClick={() => handleStatusChange('resolved')}
+                                disabled={isSubmitting}
+                            >
+                                Resolved
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className={`px-2 py-1 rounded-full text-xs inline-block ${STATUS_COLORS[ticket.status]}`}>
+                            {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
+                        </div>
+                    )}
                 </div>
 
                 {/* Agent/Team Assignment */}
