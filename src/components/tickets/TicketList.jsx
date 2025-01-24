@@ -90,23 +90,42 @@ function TicketList() {
         fetchUserRoleAndTickets();
 
         // Set up realtime subscription
-        const channel = supabase
-            .channel('tickets_channel')
-            .on('postgres_changes',
-                {
-                    event: '*',
-                    schema: 'public',
-                    table: 'tickets'
-                },
-                () => {
-                    // Refresh tickets when there's a change
-                    fetchUserRoleAndTickets();
-                }
-            )
-            .subscribe();
+        let subscription = null;
 
+        async function setupRealtime() {
+            try {
+                // Subscribe to real-time changes
+                subscription = supabase
+                    .channel('tickets_channel')
+                    .on(
+                        'postgres_changes',
+                        { event: '*', schema: 'public', table: 'tickets' },
+                        payload => {
+                            console.log('Realtime update:', payload);
+                            // Update your state here...
+                            fetchUserRoleAndTickets();
+                        }
+                    )
+                    .subscribe();
+
+                // Make sure you catch any subscription errors
+                subscription.on('error', (err) => {
+                    console.error('Subscription error:', err);
+                    // Set loading to false or handle error state...
+                    setLoading(false);
+                });
+            } catch (error) {
+                console.error('Error setting up Realtime:', error);
+            }
+        }
+
+        setupRealtime();
+
+        // Cleanup on unmount
         return () => {
-            supabase.removeChannel(channel);
+            if (subscription) {
+                subscription.unsubscribe();
+            }
         };
     }, [sortField, sortDirection, assignmentFilter]);
 

@@ -32,19 +32,21 @@ function TicketDetail() {
 
     // Fetch ticket data and user role
     useEffect(() => {
-        const fetchTicketData = async () => {
+        async function fetchTicketData() {
+            setLoading(true);
             try {
-                const { data: { user } } = await supabase.auth.getUser();
+                const { data: { user }, error: authError } = await supabase.auth.getUser();
+                if (authError) throw authError;
                 if (!user) throw new Error('Not authenticated');
 
                 // Get user role
-                const { data: userData, error: userError } = await supabase
+                const { data: userData, error: userDataError } = await supabase
                     .from('users')
                     .select('role')
                     .eq('id', user.id)
                     .single();
 
-                if (userError) throw userError;
+                if (userDataError) throw userDataError;
                 setUserRole(userData.role);
 
                 // Fetch ticket with customer info
@@ -105,12 +107,12 @@ function TicketDetail() {
                     setNotes(notesData);
                 }
             } catch (err) {
-                console.error('Error:', err);
+                console.error('Error fetching ticket:', err);
                 setError(err.message);
             } finally {
                 setLoading(false);
             }
-        };
+        }
 
         fetchTicketData();
 
@@ -144,6 +146,10 @@ function TicketDetail() {
                 },
                 () => fetchTicketData()
             )
+            .on('error', (subscriptionError) => {
+                console.error('Realtime subscription error:', subscriptionError);
+                setLoading(false);
+            })
             .subscribe();
 
         return () => {

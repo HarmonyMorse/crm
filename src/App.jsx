@@ -42,17 +42,24 @@ const AdminRoute = () => {
 
   useEffect(() => {
     async function getUserRole() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (user) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', user.id)
-          .single()
+      try {
+        const { data: { user }, error } = await supabase.auth.getUser()
+        if (error) throw error
 
-        setUserRole(profile?.role)
+        if (user) {
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+          if (profileError) throw profileError
+          setUserRole(profile?.role)
+        }
+      } catch (err) {
+        console.error('AdminRoute error:', err)
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     getUserRole()
   }, [])
