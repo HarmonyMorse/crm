@@ -20,6 +20,13 @@ export default function AuthComponent() {
             // When a user signs up or signs in, create/verify their database record
             if (_event === 'SIGNED_IN' && session) {
                 try {
+                    // Check if user already exists
+                    const { data: existingUser } = await supabase
+                        .from('users')
+                        .select('role')
+                        .eq('id', session.user.id)
+                        .single();
+
                     // Create or update the user record in our database
                     const { error: upsertError } = await supabase
                         .from('users')
@@ -27,7 +34,7 @@ export default function AuthComponent() {
                             id: session.user.id,
                             email: session.user.email,
                             name: session.user.user_metadata?.name || session.user.email.split('@')[0],
-                            role: 'customer' // All new signups are customers by default
+                            role: existingUser?.role || 'customer' // Preserve existing role or set to customer for new users
                         })
 
                     if (upsertError) {
