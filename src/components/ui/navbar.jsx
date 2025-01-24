@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { supabase } from '../../lib/supabaseClient'
 import { Button } from './button'
+import { ThemeToggle } from './theme-toggle'
 
 export default function Navbar() {
     const [userRole, setUserRole] = useState(null)
@@ -47,9 +48,12 @@ export default function Navbar() {
                             </Link>
                         )}
                     </div>
-                    <Button variant="ghost" onClick={handleSignOut}>
-                        Sign Out
-                    </Button>
+                    <div className="flex items-center space-x-4">
+                        <ThemeToggle />
+                        <Button variant="ghost" onClick={handleSignOut}>
+                            Sign Out
+                        </Button>
+                    </div>
                 </div>
             </div>
         </nav>

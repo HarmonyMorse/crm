@@ -8,6 +8,7 @@ import CreateTicket from './pages/CreateTicket.jsx'
 import TicketDetail from './components/tickets/TicketDetail'
 import AdminPortal from './pages/AdminPortal'
 import Navbar from './components/ui/navbar'
+import { ThemeProvider } from './components/ui/theme-provider'
 
 // Protected route component that checks user role
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -67,31 +68,37 @@ function App() {
   }, [])
 
   if (!session) {
-    return <AuthComponent />
+    return (
+      <ThemeProvider>
+        <AuthComponent />
+      </ThemeProvider>
+    )
   }
 
   return (
-    <Router>
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="container mx-auto py-8">
-          <Routes>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/tickets/create" element={<CreateTicket />} />
-            <Route path="/tickets/:id" element={<TicketDetail />} />
-            <Route
-              path="/admin"
-              element={
-                <ProtectedRoute allowedRoles={['admin']}>
-                  <AdminPortal />
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
+    <ThemeProvider>
+      <Router>
+        <div className="min-h-screen bg-background text-foreground">
+          <Navbar />
+          <div className="container mx-auto py-8">
+            <Routes>
+              <Route path="/" element={<Navigate to="/dashboard" replace />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/tickets/create" element={<CreateTicket />} />
+              <Route path="/tickets/:id" element={<TicketDetail />} />
+              <Route
+                path="/admin"
+                element={
+                  <ProtectedRoute allowedRoles={['admin']}>
+                    <AdminPortal />
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </div>
         </div>
-      </div>
-    </Router>
+      </Router>
+    </ThemeProvider>
   )
 }
 
