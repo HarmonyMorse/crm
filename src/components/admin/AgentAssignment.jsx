@@ -46,7 +46,7 @@ export default function AgentAssignment() {
             const { data, error } = await supabase
                 .from('users')
                 .select('*')
-                .neq('role', 'admin')
+                .eq('role', 'agent')
                 .order('name')
 
             if (error) throw error
@@ -107,7 +107,7 @@ export default function AgentAssignment() {
             <form onSubmit={assignToTeam} className="space-y-4">
                 <div>
                     <label htmlFor="agentSelect" className="block text-sm font-medium mb-2">
-                        Select User to Make Agent
+                        Select Agent to Assign
                     </label>
                     <select
                         id="agentSelect"
@@ -119,7 +119,7 @@ export default function AgentAssignment() {
                         className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         required
                     >
-                        <option value="">Select a user</option>
+                        <option value="">Select an agent</option>
                         {agents.map((agent) => (
                             <option key={agent.id} value={agent.id}>
                                 {agent.name || agent.email}
