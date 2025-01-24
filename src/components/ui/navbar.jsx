@@ -49,6 +49,12 @@ export default function Navbar() {
                         )}
                     </div>
                     <div className="flex items-center space-x-4">
+                        <Link
+                            to="/settings"
+                            className={`text-sm font-medium ${location.pathname === '/settings' ? 'text-primary' : 'text-muted-foreground'}`}
+                        >
+                            Settings
+                        </Link>
                         <ThemeToggle />
                         <Button variant="ghost" onClick={handleSignOut}>
                             Sign Out
