@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/button';
 import { Check, Copy } from 'lucide-react';
+import { CustomerInfoModal } from '../ui/CustomerInfoModal';
 
 const PRIORITY_COLORS = {
     high: 'text-red-400',
@@ -50,7 +51,8 @@ function TicketList() {
                         *,
                         customer:users!tickets_customer_id_fkey(
                             email,
-                            name
+                            name,
+                            created_at
                         )
                     `)
                     .order(sortField, { ascending: sortDirection === 'asc' });
@@ -210,7 +212,10 @@ function TicketList() {
                                 </td>
                                 {userRole !== 'customer' && (
                                     <td className="px-4 py-2 text-foreground">
-                                        {ticket.customer.name || ticket.customer.email}
+                                        <div className="flex items-center gap-2">
+                                            <CustomerInfoModal customer={ticket.customer} />
+                                            <span>{ticket.customer.name || ticket.customer.email}</span>
+                                        </div>
                                     </td>
                                 )}
                                 <td className="px-4 py-2">

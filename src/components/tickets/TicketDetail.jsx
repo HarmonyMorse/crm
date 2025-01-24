@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/button';
 import AgentAssignment from './AgentAssignment';
+import { CustomerInfoModal } from '../ui/CustomerInfoModal';
 
 const PRIORITY_COLORS = {
     high: 'text-red-400',
@@ -53,7 +54,8 @@ function TicketDetail() {
                         *,
                         customer:users!tickets_customer_id_fkey(
                             email,
-                            name
+                            name,
+                            created_at
                         ),
                         assigned_agent:users!tickets_assigned_agent_id_fkey(
                             email,
@@ -260,9 +262,12 @@ function TicketDetail() {
                         {ticket.title}
                     </h1>
                     <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                        <span>
-                            Opened by: {ticket.customer.name || ticket.customer.email}
-                        </span>
+                        <div className="flex items-center gap-2">
+                            <CustomerInfoModal customer={ticket.customer} />
+                            <span>
+                                Opened by: {ticket.customer.name || ticket.customer.email}
+                            </span>
+                        </div>
                         <span>
                             Created: {new Date(ticket.created_at).toLocaleDateString()}
                         </span>
