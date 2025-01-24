@@ -1,30 +1,52 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select';
 
 const PRIORITY_OPTIONS = ['low', 'medium', 'high'];
 const STATUS_OPTIONS = ['open', 'pending', 'resolved'];
 
 function CreateTicket() {
     const navigate = useNavigate();
-    const [isSubmitting, setIsSubmitting] = useState(false);
     const [formData, setFormData] = useState({
         title: '',
         description: '',
         priority: 'low',
         status: 'open',
-        tags: []
+        tags: [],
+        custom_fields: {}
     });
     const [tagInput, setTagInput] = useState('');
     const [error, setError] = useState(null);
     const [fieldErrors, setFieldErrors] = useState({});
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [customFields, setCustomFields] = useState([]);
+
+    useEffect(() => {
+        loadCustomFields();
+    }, []);
+
+    const loadCustomFields = async () => {
+        const { data, error } = await supabase
+            .from('custom_field_definitions')
+            .select('*')
+            .eq('active', true)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            setError(error.message);
+        } else {
+            setCustomFields(data);
+        }
+    };
 
     const handleChange = (e) => {
-        const { name, value } = e.target;
+        const { name, value, type, checked } = e.target;
         setFormData(prev => ({
             ...prev,
-            [name]: value
+            [name]: type === 'checkbox' ? checked : value
         }));
         // Clear field error when user starts typing
         if (fieldErrors[name]) {
@@ -33,6 +55,19 @@ function CreateTicket() {
                 [name]: null
             }));
         }
+    };
+
+    const handleCustomFieldChange = (fieldName, value) => {
+        setFormData(prev => ({
+            ...prev,
+            custom_fields: {
+                ...prev.custom_fields,
+                [fieldName]: {
+                    type: customFields.find(f => f.name === fieldName).field_type,
+                    value
+                }
+            }
+        }));
     };
 
     const handleTagInputChange = (e) => {
@@ -74,6 +109,13 @@ function CreateTicket() {
             errors.status = 'Invalid status value';
         }
 
+        // Validate required custom fields
+        customFields.forEach(field => {
+            if (field.required && !formData.custom_fields[field.name]?.value) {
+                errors[`custom_${field.name}`] = `${field.name} is required`;
+            }
+        });
+
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -97,8 +139,7 @@ function CreateTicket() {
                 throw new Error('You must be logged in to create a ticket');
             }
 
-            // First, ensure user exists in our users table
-            const { data: existingUser, error: userError } = await supabase
+            const { data: existingUser } = await supabase
                 .from('users')
                 .select('id')
                 .eq('id', user.id)
@@ -129,7 +170,8 @@ function CreateTicket() {
                     priority: formData.priority,
                     status: formData.status,
                     tags: formData.tags,
-                    customer_id: user.id
+                    customer_id: user.id,
+                    custom_fields: formData.custom_fields
                 })
                 .select('*')
                 .single();
@@ -149,6 +191,69 @@ function CreateTicket() {
             setError(err.message);
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const renderCustomField = (field) => {
+        const value = formData.custom_fields[field.name]?.value || '';
+        const error = fieldErrors[`custom_${field.name}`];
+
+        switch (field.field_type) {
+            case 'text':
+                return (
+                    <Input
+                        value={value}
+                        onChange={(e) => handleCustomFieldChange(field.name, e.target.value)}
+                        className={error ? 'border-red-500' : ''}
+                    />
+                );
+            case 'number':
+                return (
+                    <Input
+                        type="number"
+                        value={value}
+                        onChange={(e) => handleCustomFieldChange(field.name, e.target.value)}
+                        className={error ? 'border-red-500' : ''}
+                    />
+                );
+            case 'date':
+                return (
+                    <Input
+                        type="date"
+                        value={value}
+                        onChange={(e) => handleCustomFieldChange(field.name, e.target.value)}
+                        className={error ? 'border-red-500' : ''}
+                    />
+                );
+            case 'boolean':
+                return (
+                    <input
+                        type="checkbox"
+                        checked={value}
+                        onChange={(e) => handleCustomFieldChange(field.name, e.target.checked)}
+                        className={`rounded border-input ${error ? 'border-red-500' : ''}`}
+                    />
+                );
+            case 'select':
+                return (
+                    <Select
+                        value={value}
+                        onValueChange={(value) => handleCustomFieldChange(field.name, value)}
+                    >
+                        <SelectTrigger className={error ? 'border-red-500' : ''}>
+                            <SelectValue placeholder="Select an option" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {field.options.map(option => (
+                                <SelectItem key={option} value={option}>
+                                    {option}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                );
+            default:
+                return null;
         }
     };
 
@@ -172,123 +277,137 @@ function CreateTicket() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                    <label htmlFor="title" className="block text-sm font-medium mb-2 text-foreground">
-                        Title *
+                    <label className="block text-sm font-medium mb-1">
+                        Title
                     </label>
-                    <input
-                        type="text"
-                        id="title"
+                    <Input
                         name="title"
                         value={formData.title}
                         onChange={handleChange}
-                        required
-                        className={`w-full p-2 bg-background border rounded-md text-foreground ${fieldErrors.title ? 'border-red-500' : 'border-input'
-                            }`}
+                        className={fieldErrors.title ? 'border-red-500' : ''}
                     />
                     {fieldErrors.title && (
-                        <p className="text-red-400 text-sm mt-1">{fieldErrors.title}</p>
+                        <p className="text-sm text-red-400 mt-1">{fieldErrors.title}</p>
                     )}
                 </div>
 
                 <div>
-                    <label htmlFor="description" className="block text-sm font-medium mb-2 text-foreground">
+                    <label className="block text-sm font-medium mb-1">
                         Description
                     </label>
                     <textarea
-                        id="description"
                         name="description"
                         value={formData.description}
                         onChange={handleChange}
-                        rows={5}
-                        className="w-full p-2 bg-background border border-input rounded-md text-foreground"
+                        rows={4}
+                        className="w-full p-2 bg-background border border-input rounded-md text-foreground placeholder:text-muted-foreground"
                     />
                 </div>
 
-                <div>
-                    <label htmlFor="priority" className="block text-sm font-medium mb-2 text-foreground">
-                        Priority
-                    </label>
-                    <select
-                        id="priority"
-                        name="priority"
-                        value={formData.priority}
-                        onChange={handleChange}
-                        className={`w-full p-2 bg-background border rounded-md text-foreground ${fieldErrors.priority ? 'border-red-500' : 'border-input'
-                            }`}
-                    >
-                        {PRIORITY_OPTIONS.map(option => (
-                            <option key={option} value={option} className="bg-background">
-                                {option.charAt(0).toUpperCase() + option.slice(1)}
-                            </option>
-                        ))}
-                    </select>
-                    {fieldErrors.priority && (
-                        <p className="text-red-400 text-sm mt-1">{fieldErrors.priority}</p>
-                    )}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-1">
+                            Priority
+                        </label>
+                        <Select
+                            value={formData.priority}
+                            onValueChange={(value) => handleChange({ target: { name: 'priority', value } })}
+                        >
+                            <SelectTrigger className={fieldErrors.priority ? 'border-red-500' : ''}>
+                                <SelectValue placeholder="Select priority" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {PRIORITY_OPTIONS.map(option => (
+                                    <SelectItem key={option} value={option}>
+                                        {option.charAt(0).toUpperCase() + option.slice(1)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {fieldErrors.priority && (
+                            <p className="text-sm text-red-400 mt-1">{fieldErrors.priority}</p>
+                        )}
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium mb-1">
+                            Status
+                        </label>
+                        <Select
+                            value={formData.status}
+                            onValueChange={(value) => handleChange({ target: { name: 'status', value } })}
+                        >
+                            <SelectTrigger className={fieldErrors.status ? 'border-red-500' : ''}>
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {STATUS_OPTIONS.map(option => (
+                                    <SelectItem key={option} value={option}>
+                                        {option.charAt(0).toUpperCase() + option.slice(1)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        {fieldErrors.status && (
+                            <p className="text-sm text-red-400 mt-1">{fieldErrors.status}</p>
+                        )}
+                    </div>
                 </div>
 
                 <div>
-                    <label htmlFor="status" className="block text-sm font-medium mb-2 text-foreground">
-                        Status
-                    </label>
-                    <select
-                        id="status"
-                        name="status"
-                        value={formData.status}
-                        onChange={handleChange}
-                        className={`w-full p-2 bg-background border rounded-md text-foreground ${fieldErrors.status ? 'border-red-500' : 'border-input'
-                            }`}
-                    >
-                        {STATUS_OPTIONS.map(option => (
-                            <option key={option} value={option} className="bg-background">
-                                {option.charAt(0).toUpperCase() + option.slice(1)}
-                            </option>
-                        ))}
-                    </select>
-                    {fieldErrors.status && (
-                        <p className="text-red-400 text-sm mt-1">{fieldErrors.status}</p>
-                    )}
-                </div>
-
-                <div>
-                    <label htmlFor="tags" className="block text-sm font-medium mb-2 text-foreground">
+                    <label className="block text-sm font-medium mb-1">
                         Tags
                     </label>
                     <div className="flex flex-wrap gap-2 mb-2">
                         {formData.tags.map(tag => (
                             <span
                                 key={tag}
-                                className="bg-primary/20 text-primary-foreground px-2 py-1 rounded-md text-sm flex items-center"
+                                className="bg-primary/20 text-primary-foreground px-2 py-1 rounded text-sm flex items-center gap-1"
                             >
                                 {tag}
                                 <button
                                     type="button"
                                     onClick={() => removeTag(tag)}
-                                    className="ml-2 text-primary-foreground hover:text-primary"
+                                    className="text-primary-foreground/80 hover:text-primary-foreground"
                                 >
                                     ×
                                 </button>
                             </span>
                         ))}
                     </div>
-                    <input
-                        type="text"
-                        id="tags"
+                    <Input
                         value={tagInput}
                         onChange={handleTagInputChange}
                         onKeyDown={handleTagKeyDown}
                         placeholder="Type a tag and press Enter"
-                        className="w-full p-2 bg-background border border-input rounded-md text-foreground placeholder:text-muted-foreground"
                     />
                 </div>
+
+                {customFields.length > 0 && (
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Custom Fields</h3>
+                        {customFields.map(field => (
+                            <div key={field.id}>
+                                <label className="block text-sm font-medium mb-1">
+                                    {field.name}
+                                    {field.required && ' *'}
+                                </label>
+                                {renderCustomField(field)}
+                                {fieldErrors[`custom_${field.name}`] && (
+                                    <p className="text-sm text-red-400 mt-1">
+                                        {fieldErrors[`custom_${field.name}`]}
+                                    </p>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
 
                 <Button
                     type="submit"
                     disabled={isSubmitting}
-                    variant="default"
-                    className="w-full"
                 >
-                    {isSubmitting ? 'Creating...' : 'Create Ticket'}
+                    Create Ticket
                 </Button>
             </form>
         </div>

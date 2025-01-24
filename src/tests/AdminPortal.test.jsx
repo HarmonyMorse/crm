@@ -13,9 +13,19 @@ const mockTeams = [
     { id: 2, name: 'Team B', team_members: [{ user: { id: 1, name: 'John Doe' } }] }
 ]
 
+const mockCustomFields = [
+    { id: 1, name: 'Priority Level', field_type: 'select', required: true, options: ['High', 'Medium', 'Low'], active: true },
+    { id: 2, name: 'Due Date', field_type: 'date', required: false, active: true }
+]
+
 // Create mock functions
 const mockEq = vi.fn().mockReturnThis()
-const mockOrder = vi.fn().mockReturnValue({ data: mockTeams, error: null })
+const mockOrder = vi.fn().mockImplementation((field) => {
+    if (field === 'created_at') {
+        return { data: mockCustomFields, error: null }
+    }
+    return { data: mockTeams, error: null }
+})
 
 // Mock Supabase client
 vi.mock('../lib/supabaseClient', () => ({
@@ -23,36 +33,58 @@ vi.mock('../lib/supabaseClient', () => ({
         auth: {
             getUser: vi.fn(),
         },
-        from: vi.fn(() => ({
-            select: () => ({
-                eq: mockEq,
-                order: mockOrder,
-            }),
-            insert: () => ({
+        from: vi.fn((table) => {
+            const commonMethods = {
                 select: () => ({
-                    single: () => ({
-                        data: { id: 3, name: 'New Team', team_members: [] },
+                    eq: mockEq,
+                    order: mockOrder,
+                }),
+                update: () => ({
+                    eq: () => ({
+                        select: () => ({
+                            single: () => ({
+                                data: table === 'custom_field_definitions'
+                                    ? { id: 1, name: 'Updated Field', field_type: 'text', required: true, active: true }
+                                    : { id: 1, name: 'Updated Team', team_members: [] },
+                                error: null
+                            })
+                        })
+                    })
+                }),
+                delete: () => ({
+                    eq: () => ({
+                        data: null,
                         error: null
                     })
                 })
-            }),
-            update: () => ({
-                eq: () => ({
+            }
+
+            if (table === 'custom_field_definitions') {
+                return {
+                    ...commonMethods,
+                    insert: () => ({
+                        select: () => ({
+                            single: () => ({
+                                data: { id: 3, name: 'New Field', field_type: 'text', required: false, active: true },
+                                error: null
+                            })
+                        })
+                    })
+                }
+            }
+
+            return {
+                ...commonMethods,
+                insert: () => ({
                     select: () => ({
                         single: () => ({
-                            data: { id: 1, name: 'Updated Team', team_members: [] },
+                            data: { id: 3, name: 'New Team', team_members: [] },
                             error: null
                         })
                     })
                 })
-            }),
-            delete: () => ({
-                eq: () => ({
-                    data: null,
-                    error: null
-                })
-            })
-        })),
+            }
+        }),
     }
 }))
 
@@ -71,6 +103,8 @@ describe('AdminPortal', () => {
         expect(screen.getByText('Admin Portal')).toBeInTheDocument()
         expect(screen.getByRole('tab', { name: /teams/i })).toBeInTheDocument()
         expect(screen.getByRole('tab', { name: /agents/i })).toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: /users/i })).toBeInTheDocument()
+        expect(screen.getByRole('tab', { name: /custom fields/i })).toBeInTheDocument()
     })
 
     it('shows team management section with teams list', async () => {
@@ -145,6 +179,69 @@ describe('AdminPortal', () => {
 
         await waitFor(() => {
             expect(screen.queryByText('Team A')).not.toBeInTheDocument()
+        })
+    })
+
+    it('shows custom fields management section', async () => {
+        render(
+            <BrowserRouter>
+                <AdminPortal />
+            </BrowserRouter>
+        )
+
+        // Click on Custom Fields tab
+        fireEvent.click(screen.getByRole('tab', { name: /custom fields/i }))
+
+        await waitForElementToBeRemoved(() => screen.queryByText(/loading/i))
+
+        expect(screen.getByText('Custom Fields Manager')).toBeInTheDocument()
+        expect(screen.getByText('Priority Level')).toBeInTheDocument()
+        expect(screen.getByText('Due Date')).toBeInTheDocument()
+    })
+
+    it('allows creating a new custom field', async () => {
+        render(
+            <BrowserRouter>
+                <AdminPortal />
+            </BrowserRouter>
+        )
+
+        // Click on Custom Fields tab
+        fireEvent.click(screen.getByRole('tab', { name: /custom fields/i }))
+
+        await waitForElementToBeRemoved(() => screen.queryByText(/loading/i))
+
+        // Fill out the form
+        fireEvent.change(screen.getByLabelText(/field name/i), {
+            target: { value: 'New Field' }
+        })
+
+        // Submit the form
+        fireEvent.click(screen.getByText(/add field/i))
+
+        await waitFor(() => {
+            expect(screen.getByText('New Field')).toBeInTheDocument()
+        })
+    })
+
+    it('allows toggling custom field active state', async () => {
+        render(
+            <BrowserRouter>
+                <AdminPortal />
+            </BrowserRouter>
+        )
+
+        // Click on Custom Fields tab
+        fireEvent.click(screen.getByRole('tab', { name: /custom fields/i }))
+
+        await waitForElementToBeRemoved(() => screen.queryByText(/loading/i))
+
+        // Find and click the active toggle button
+        const toggleButton = screen.getAllByText('Active')[0]
+        fireEvent.click(toggleButton)
+
+        await waitFor(() => {
+            expect(screen.getByText('Inactive')).toBeInTheDocument()
         })
     })
 }) 

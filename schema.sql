@@ -5,12 +5,14 @@ DROP TABLE IF EXISTS team_members CASCADE;
 DROP TABLE IF EXISTS teams CASCADE;
 DROP TABLE IF EXISTS tickets CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS custom_field_definitions CASCADE;
 
 -- Drop existing types
 DROP TYPE IF EXISTS ticket_status CASCADE;
 DROP TYPE IF EXISTS ticket_priority CASCADE;
 DROP TYPE IF EXISTS message_type CASCADE;
 DROP TYPE IF EXISTS user_role CASCADE;
+DROP TYPE IF EXISTS custom_field_type CASCADE;
 
 -- Create extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -20,6 +22,7 @@ CREATE TYPE ticket_status AS ENUM ('open', 'pending', 'resolved');
 CREATE TYPE ticket_priority AS ENUM ('low', 'medium', 'high');
 CREATE TYPE message_type AS ENUM ('customer', 'agent', 'system');
 CREATE TYPE user_role AS ENUM ('admin', 'agent', 'customer');
+CREATE TYPE custom_field_type AS ENUM ('text', 'number', 'date', 'boolean', 'select');
 
 -- Create users table (separate from auth.users for additional fields)
 CREATE TABLE users (
@@ -36,6 +39,18 @@ CREATE TABLE teams (
   name TEXT UNIQUE NOT NULL
 );
 
+-- Create custom field definitions table
+CREATE TABLE custom_field_definitions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  name TEXT NOT NULL,
+  field_type custom_field_type NOT NULL,
+  required BOOLEAN DEFAULT false,
+  options JSONB, -- For select type fields to store options
+  active BOOLEAN DEFAULT true,
+  UNIQUE(name)
+);
+
 -- Create tickets table
 CREATE TABLE tickets (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -48,7 +63,8 @@ CREATE TABLE tickets (
   customer_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   assigned_agent_id UUID REFERENCES users(id) ON DELETE SET NULL,
   assigned_team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
-  tags TEXT[]
+  tags TEXT[],
+  custom_fields JSONB DEFAULT '{}'::jsonb
 );
 
 -- Create team_members table
@@ -293,5 +309,18 @@ CREATE POLICY tickets_update_assigned ON tickets
           )
         ))
       )
+    )
+  );
+
+-- Custom field definitions policies
+CREATE POLICY custom_field_definitions_select_all ON custom_field_definitions
+  FOR SELECT USING (true);
+
+CREATE POLICY custom_field_definitions_modify_admin ON custom_field_definitions
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM users u 
+      WHERE u.id = auth.uid() 
+      AND u.role = 'admin'
     )
   );

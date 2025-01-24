@@ -292,6 +292,25 @@ function TicketDetail() {
                 )}
             </div>
 
+            {/* Custom Fields */}
+            {ticket.custom_fields && Object.keys(ticket.custom_fields).length > 0 && (
+                <div className="space-y-2">
+                    <h3 className="text-lg font-medium">Custom Fields</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {Object.entries(ticket.custom_fields).map(([fieldName, field]) => (
+                            <div key={fieldName} className="flex justify-between p-2 bg-muted/50 rounded">
+                                <span className="font-medium">{fieldName}:</span>
+                                <span className="text-muted-foreground">
+                                    {field.type === 'boolean'
+                                        ? (field.value ? 'Yes' : 'No')
+                                        : field.value}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Status and Assignment Section */}
             <div className="grid gap-4 md:grid-cols-2">
                 {/* Status Controls */}
