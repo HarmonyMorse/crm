@@ -53,6 +53,12 @@ function TicketList() {
                             email,
                             name,
                             created_at
+                        ),
+                        assigned_agent:users!tickets_assigned_agent_id_fkey(
+                            name
+                        ),
+                        assigned_team:teams!tickets_assigned_team_id_fkey(
+                            name
                         )
                     `)
                     .order(sortField, { ascending: sortDirection === 'asc' });
@@ -176,6 +182,9 @@ function TicketList() {
                             >
                                 Priority {sortField === 'priority' && (sortDirection === 'asc' ? '↑' : '↓')}
                             </th>
+                            <th className="px-4 py-2 text-left text-foreground">
+                                Assigned To
+                            </th>
                             <th
                                 className="px-4 py-2 text-left text-foreground cursor-pointer hover:bg-muted"
                                 onClick={() => handleSort('created_at')}
@@ -223,10 +232,13 @@ function TicketList() {
                                         {ticket.status.charAt(0).toUpperCase() + ticket.status.slice(1)}
                                     </span>
                                 </td>
-                                <td className="px-4 py-2">
-                                    <span className={PRIORITY_COLORS[ticket.priority]}>
-                                        {ticket.priority.charAt(0).toUpperCase() + ticket.priority.slice(1)}
+                                <td className="px-4 py-2 text-foreground">
+                                    <span className={`inline-flex items-center rounded-md px-2 py-1 text-sm font-medium ${PRIORITY_COLORS[ticket.priority]}`}>
+                                        {ticket.priority}
                                     </span>
+                                </td>
+                                <td className="px-4 py-2 text-foreground">
+                                    {ticket.assigned_agent?.name || ticket.assigned_team?.name || 'Unassigned'}
                                 </td>
                                 <td className="px-4 py-2 text-foreground">
                                     {new Date(ticket.created_at).toLocaleDateString()}
