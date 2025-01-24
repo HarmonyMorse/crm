@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabaseClient';
 import { Button } from '../ui/button';
-import { Check, Copy } from 'lucide-react';
+import { Check, Copy, Filter } from 'lucide-react';
 import { CustomerInfoModal } from '../ui/CustomerInfoModal';
 
 const PRIORITY_COLORS = {
@@ -26,6 +26,7 @@ function TicketList() {
     const [sortDirection, setSortDirection] = useState('desc');
     const [userRole, setUserRole] = useState(null);
     const [copiedId, setCopiedId] = useState(null);
+    const [assignmentFilter, setAssignmentFilter] = useState('all'); // 'all', 'me', 'unassigned'
 
     // Fetch user role and tickets
     useEffect(() => {
@@ -66,6 +67,12 @@ function TicketList() {
                 // If user is a customer, only show their tickets
                 if (userData.role === 'customer') {
                     query = query.eq('customer_id', user.id);
+                } else if (userData.role === 'agent' && assignmentFilter !== 'all') {
+                    if (assignmentFilter === 'me') {
+                        query = query.eq('assigned_agent_id', user.id);
+                    } else if (assignmentFilter === 'unassigned') {
+                        query = query.is('assigned_agent_id', null).is('assigned_team_id', null);
+                    }
                 }
 
                 const { data: ticketsData, error: ticketsError } = await query;
@@ -101,7 +108,7 @@ function TicketList() {
         return () => {
             supabase.removeChannel(channel);
         };
-    }, [sortField, sortDirection]);
+    }, [sortField, sortDirection, assignmentFilter]);
 
     const handleSort = (field) => {
         if (field === sortField) {
@@ -183,7 +190,31 @@ function TicketList() {
                                 Priority {sortField === 'priority' && (sortDirection === 'asc' ? '↑' : '↓')}
                             </th>
                             <th className="px-4 py-2 text-left text-foreground">
-                                Assigned To
+                                <div className="flex items-center gap-2">
+                                    Assigned To
+                                    {userRole === 'agent' && (
+                                        <div className="relative">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className={`p-1 ${assignmentFilter !== 'all' ? 'text-primary' : ''}`}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setAssignmentFilter(current => {
+                                                        if (current === 'all') return 'me';
+                                                        if (current === 'me') return 'unassigned';
+                                                        return 'all';
+                                                    });
+                                                }}
+                                            >
+                                                <Filter className="h-4 w-4" />
+                                            </Button>
+                                            <span className="absolute -top-1 -right-1 text-[10px] text-primary">
+                                                {assignmentFilter !== 'all' && (assignmentFilter === 'me' ? '👤' : '∅')}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
                             </th>
                             <th
                                 className="px-4 py-2 text-left text-foreground cursor-pointer hover:bg-muted"
