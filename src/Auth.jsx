@@ -25,7 +25,7 @@ export default function AuthComponent() {
                     // Check if user already exists
                     const { data: existingUser } = await supabase
                         .from('users')
-                        .select('role')
+                        .select('role, name')
                         .eq('id', session.user.id)
                         .single();
 
@@ -35,7 +35,7 @@ export default function AuthComponent() {
                         .upsert({
                             id: session.user.id,
                             email: session.user.email,
-                            name: session.user.user_metadata?.name || session.user.email.split('@')[0],
+                            name: existingUser?.name || session.user.user_metadata?.name || session.user.email.split('@')[0],
                             role: existingUser?.role || 'customer' // Preserve existing role or set to customer for new users
                         })
 
