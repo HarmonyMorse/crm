@@ -124,7 +124,7 @@ function TicketList() {
         // Cleanup on unmount
         return () => {
             if (subscription) {
-                subscription.unsubscribe();
+                supabase.removeChannel(subscription);
             }
         };
     }, [sortField, sortDirection, assignmentFilter]);

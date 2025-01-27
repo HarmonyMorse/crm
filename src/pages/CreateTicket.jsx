@@ -277,10 +277,11 @@ function CreateTicket() {
 
             <form onSubmit={handleSubmit} className="space-y-6">
                 <div>
-                    <label className="block text-sm font-medium mb-1">
+                    <label className="block text-sm font-medium mb-1" htmlFor="title">
                         Title
                     </label>
                     <Input
+                        id="title"
                         name="title"
                         value={formData.title}
                         onChange={handleChange}
