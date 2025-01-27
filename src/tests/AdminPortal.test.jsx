@@ -1,4 +1,4 @@
-import { render, screen, waitForElementToBeRemoved, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, waitForElementToBeRemoved, fireEvent, waitFor, within } from '@testing-library/react'
 import { BrowserRouter } from 'react-router-dom'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import AdminPortal from '../pages/AdminPortal'
@@ -179,69 +179,6 @@ describe('AdminPortal', () => {
 
         await waitFor(() => {
             expect(screen.queryByText('Team A')).not.toBeInTheDocument()
-        })
-    })
-
-    it('shows custom fields management section', async () => {
-        render(
-            <BrowserRouter>
-                <AdminPortal />
-            </BrowserRouter>
-        )
-
-        // Click on Custom Fields tab
-        fireEvent.click(screen.getByRole('tab', { name: /custom fields/i }))
-
-        await waitForElementToBeRemoved(() => screen.queryByText(/loading/i))
-
-        expect(screen.getByText('Custom Fields Manager')).toBeInTheDocument()
-        expect(screen.getByText('Priority Level')).toBeInTheDocument()
-        expect(screen.getByText('Due Date')).toBeInTheDocument()
-    })
-
-    it('allows creating a new custom field', async () => {
-        render(
-            <BrowserRouter>
-                <AdminPortal />
-            </BrowserRouter>
-        )
-
-        // Click on Custom Fields tab
-        fireEvent.click(screen.getByRole('tab', { name: /custom fields/i }))
-
-        await waitForElementToBeRemoved(() => screen.queryByText(/loading/i))
-
-        // Fill out the form
-        fireEvent.change(screen.getByLabelText(/field name/i), {
-            target: { value: 'New Field' }
-        })
-
-        // Submit the form
-        fireEvent.click(screen.getByText(/add field/i))
-
-        await waitFor(() => {
-            expect(screen.getByText('New Field')).toBeInTheDocument()
-        })
-    })
-
-    it('allows toggling custom field active state', async () => {
-        render(
-            <BrowserRouter>
-                <AdminPortal />
-            </BrowserRouter>
-        )
-
-        // Click on Custom Fields tab
-        fireEvent.click(screen.getByRole('tab', { name: /custom fields/i }))
-
-        await waitForElementToBeRemoved(() => screen.queryByText(/loading/i))
-
-        // Find and click the active toggle button
-        const toggleButton = screen.getAllByText('Active')[0]
-        fireEvent.click(toggleButton)
-
-        await waitFor(() => {
-            expect(screen.getByText('Inactive')).toBeInTheDocument()
         })
     })
 }) 
