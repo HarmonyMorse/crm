@@ -310,14 +310,15 @@ function CreateTicket() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-sm font-medium mb-1">
+                        <label className="block text-sm font-medium mb-1" htmlFor="priority">
                             Priority
                         </label>
                         <Select
+                            id="priority"
                             value={formData.priority}
                             onValueChange={(value) => handleChange({ target: { name: 'priority', value } })}
                         >
-                            <SelectTrigger className={fieldErrors.priority ? 'border-red-500' : ''}>
+                            <SelectTrigger className={fieldErrors.priority ? 'border-red-500' : ''} aria-label="Priority">
                                 <SelectValue placeholder="Select priority" />
                             </SelectTrigger>
                             <SelectContent>
@@ -334,14 +335,15 @@ function CreateTicket() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-medium mb-1">
+                        <label className="block text-sm font-medium mb-1" htmlFor="status">
                             Status
                         </label>
                         <Select
+                            id="status"
                             value={formData.status}
                             onValueChange={(value) => handleChange({ target: { name: 'status', value } })}
                         >
-                            <SelectTrigger className={fieldErrors.status ? 'border-red-500' : ''}>
+                            <SelectTrigger className={fieldErrors.status ? 'border-red-500' : ''} aria-label="Status">
                                 <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { supabase } from '../lib/supabaseClient';
 import CreateTicket from '../pages/CreateTicket';
@@ -58,70 +58,82 @@ describe('CreateTicket', () => {
         });
     });
 
-    it('renders the create ticket form', () => {
-        render(
-            <BrowserRouter>
-                <CreateTicket />
-            </BrowserRouter>
-        );
+    it('renders the create ticket form', async () => {
+        await act(async () => {
+            render(
+                <BrowserRouter>
+                    <CreateTicket />
+                </BrowserRouter>
+            );
+        });
 
         // Check for form elements
-        expect(screen.getByLabelText(/Title/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/Description/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/Priority/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/Status/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/Tags/i)).toBeInTheDocument();
+        expect(screen.getByRole('textbox', { name: /title/i })).toBeInTheDocument();
+        expect(screen.getByRole('textbox', { name: /description/i })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Priority' })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: 'Status' })).toBeInTheDocument();
+        expect(screen.getByPlaceholderText(/Type a tag and press Enter/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Create Ticket/i })).toBeInTheDocument();
     });
 
     it('validates required fields', async () => {
-        render(
-            <BrowserRouter>
-                <CreateTicket />
-            </BrowserRouter>
-        );
+        await act(async () => {
+            render(
+                <BrowserRouter>
+                    <CreateTicket />
+                </BrowserRouter>
+            );
+        });
 
         // Try to submit without title
         const submitButton = screen.getByRole('button', { name: /Create Ticket/i });
-        const form = submitButton.closest('form');
-        fireEvent.submit(form);
+        await act(async () => {
+            fireEvent.click(submitButton);
+        });
 
         // Wait for validation state
         await waitFor(() => {
-            const titleInput = screen.getByLabelText(/Title/i);
-            expect(titleInput.className).toContain('border-red-500');
-            const errorMessage = screen.getByText('Title is required');
-            expect(errorMessage).toHaveClass('text-red-400');
+            expect(screen.getByRole('textbox', { name: /title/i })).toHaveClass('border-red-500');
+            expect(screen.getByText('Title is required')).toHaveClass('text-red-400');
         });
     });
 
-    it('handles tag input correctly', () => {
-        render(
-            <BrowserRouter>
-                <CreateTicket />
-            </BrowserRouter>
-        );
+    it('handles tag input correctly', async () => {
+        await act(async () => {
+            render(
+                <BrowserRouter>
+                    <CreateTicket />
+                </BrowserRouter>
+            );
+        });
 
         const tagInput = screen.getByPlaceholderText(/Type a tag and press Enter/i);
 
         // Add a tag
-        fireEvent.change(tagInput, { target: { value: 'bug' } });
-        fireEvent.keyDown(tagInput, { key: 'Enter' });
+        await act(async () => {
+            fireEvent.change(tagInput, { target: { value: 'bug' } });
+            fireEvent.keyDown(tagInput, { key: 'Enter' });
+        });
 
         // Check if tag is displayed
         expect(screen.getByText('bug')).toBeInTheDocument();
         expect(tagInput.value).toBe(''); // Input should be cleared
 
         // Add another tag
-        fireEvent.change(tagInput, { target: { value: 'urgent' } });
-        fireEvent.keyDown(tagInput, { key: 'Enter' });
+        await act(async () => {
+            fireEvent.change(tagInput, { target: { value: 'urgent' } });
+            fireEvent.keyDown(tagInput, { key: 'Enter' });
+        });
 
         // Check if both tags are displayed
         expect(screen.getByText('bug')).toBeInTheDocument();
         expect(screen.getByText('urgent')).toBeInTheDocument();
 
         // Remove a tag
-        fireEvent.click(screen.getAllByText('×')[0]);
+        await act(async () => {
+            fireEvent.click(screen.getAllByText('×')[0]);
+        });
+
         expect(screen.queryByText('bug')).not.toBeInTheDocument();
         expect(screen.getByText('urgent')).toBeInTheDocument();
     });
@@ -158,27 +170,35 @@ describe('CreateTicket', () => {
             };
         });
 
-        render(
-            <BrowserRouter>
-                <CreateTicket />
-            </BrowserRouter>
-        );
+        await act(async () => {
+            render(
+                <BrowserRouter>
+                    <CreateTicket />
+                </BrowserRouter>
+            );
+        });
 
         // Fill out the form
-        fireEvent.change(screen.getByLabelText(/Title/i), {
-            target: { value: 'Test Ticket' }
-        });
-        fireEvent.change(screen.getByLabelText(/Description/i), {
-            target: { value: 'Test Description' }
+        await act(async () => {
+            fireEvent.change(screen.getByRole('textbox', { name: /title/i }), {
+                target: { value: 'Test Ticket' }
+            });
+            fireEvent.change(screen.getByRole('textbox', { name: /description/i }), {
+                target: { value: 'Test Description' }
+            });
         });
 
         // Add a tag
-        const tagInput = screen.getByPlaceholderText(/Type a tag and press Enter/i);
-        fireEvent.change(tagInput, { target: { value: 'bug' } });
-        fireEvent.keyDown(tagInput, { key: 'Enter' });
+        await act(async () => {
+            const tagInput = screen.getByPlaceholderText(/Type a tag and press Enter/i);
+            fireEvent.change(tagInput, { target: { value: 'bug' } });
+            fireEvent.keyDown(tagInput, { key: 'Enter' });
+        });
 
         // Submit the form
-        fireEvent.click(screen.getByRole('button', { name: /Create Ticket/i }));
+        await act(async () => {
+            fireEvent.click(screen.getByRole('button', { name: /Create Ticket/i }));
+        });
 
         // Wait for the form submission
         await waitFor(() => {
@@ -222,17 +242,21 @@ describe('CreateTicket', () => {
             };
         });
 
-        render(
-            <BrowserRouter>
-                <CreateTicket />
-            </BrowserRouter>
-        );
+        await act(async () => {
+            render(
+                <BrowserRouter>
+                    <CreateTicket />
+                </BrowserRouter>
+            );
+        });
 
         // Fill out and submit the form
-        fireEvent.change(screen.getByLabelText(/Title/i), {
-            target: { value: 'Test Ticket' }
+        await act(async () => {
+            fireEvent.change(screen.getByRole('textbox', { name: /title/i }), {
+                target: { value: 'Test Ticket' }
+            });
+            fireEvent.click(screen.getByRole('button', { name: /Create Ticket/i }));
         });
-        fireEvent.click(screen.getByRole('button', { name: /Create Ticket/i }));
 
         // Check if error message is displayed
         expect(await screen.findByText(/Failed to create ticket/i)).toBeInTheDocument();
