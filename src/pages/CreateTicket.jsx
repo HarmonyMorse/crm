@@ -32,13 +32,15 @@ function CreateTicket() {
         const { data, error } = await supabase
             .from('custom_field_definitions')
             .select('*')
-            .eq('active', true)
-            .order('created_at', { ascending: true });
+            .eq('active', true);
+
+        // Sort data manually if needed
+        const sortedData = data ? data.sort((a, b) => new Date(a.created_at) - new Date(b.created_at)) : [];
 
         if (error) {
             setError(error.message);
         } else {
-            setCustomFields(data);
+            setCustomFields(sortedData);
         }
     };
 
