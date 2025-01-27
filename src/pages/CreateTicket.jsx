@@ -293,10 +293,11 @@ function CreateTicket() {
                 </div>
 
                 <div>
-                    <label className="block text-sm font-medium mb-1">
+                    <label className="block text-sm font-medium mb-1" htmlFor="description">
                         Description
                     </label>
                     <textarea
+                        id="description"
                         name="description"
                         value={formData.description}
                         onChange={handleChange}
