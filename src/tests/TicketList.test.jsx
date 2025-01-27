@@ -67,7 +67,9 @@ describe('TicketList', () => {
 
         vi.spyOn(supabase, 'channel').mockReturnValue({
             on: vi.fn().mockReturnThis(),
-            subscribe: vi.fn().mockResolvedValue()
+            subscribe: vi.fn().mockResolvedValue({
+                error: null
+            })
         });
     });
 
@@ -223,7 +225,7 @@ describe('TicketList', () => {
     it('sets up and cleans up realtime subscription', async () => {
         const mockChannel = {
             on: vi.fn().mockReturnThis(),
-            subscribe: vi.fn()
+            subscribe: vi.fn().mockReturnThis()
         };
         supabase.channel.mockReturnValue(mockChannel);
 
@@ -237,6 +239,6 @@ describe('TicketList', () => {
         expect(mockChannel.subscribe).toHaveBeenCalled();
 
         unmount();
-        expect(supabase.removeChannel).toHaveBeenCalled();
+        expect(supabase.removeChannel).toHaveBeenCalledWith(mockChannel);
     });
 }); 
