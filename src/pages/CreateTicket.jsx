@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabaseClient';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../components/ui/select';
+import { generateEmbeddings } from '../utils/embeddings';
 
 const PRIORITY_OPTIONS = ['low', 'medium', 'high'];
 const STATUS_OPTIONS = ['open', 'pending', 'resolved'];
@@ -163,8 +164,8 @@ function CreateTicket() {
                 }
             }
 
-            // Now create the ticket
-            const { error: insertError } = await supabase
+            // Create the ticket
+            const { data: newTicket, error: insertError } = await supabase
                 .from('tickets')
                 .insert({
                     title: formData.title,
@@ -186,6 +187,13 @@ function CreateTicket() {
                 });
                 throw insertError;
             }
+
+            // Generate embeddings for the new ticket
+            await generateEmbeddings(
+                newTicket.id,
+                newTicket.title,
+                newTicket.description || ''
+            );
 
             // Redirect to the dashboard
             navigate('/dashboard');
