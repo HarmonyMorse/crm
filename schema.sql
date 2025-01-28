@@ -326,3 +326,89 @@ CREATE POLICY custom_field_definitions_modify_admin ON custom_field_definitions
       AND u.role = 'admin'
     )
   );
+
+-- Create bulk update function
+CREATE OR REPLACE FUNCTION bulk_update_tickets(
+  p_ticket_ids uuid[],
+  p_updates jsonb,
+  p_reason text default 'Bulk update'
+) RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_updated_count int;
+  v_ticket record;
+  v_key text;
+  v_value jsonb;
+BEGIN
+  -- Start transaction
+  BEGIN
+    -- Update tickets
+    WITH updated_tickets AS (
+      UPDATE tickets
+      SET
+        status = COALESCE((p_updates->>'status')::ticket_status, status),
+        priority = COALESCE((p_updates->>'priority')::ticket_priority, priority),
+        title = COALESCE((p_updates->>'title')::text, title),
+        description = COALESCE((p_updates->>'description')::text, description),
+        assigned_agent_id = COALESCE((p_updates->>'assigned_agent_id')::uuid, assigned_agent_id),
+        assigned_team_id = COALESCE((p_updates->>'assigned_team_id')::uuid, assigned_team_id),
+        tags = COALESCE((p_updates->>'tags')::text[], tags),
+        custom_fields = COALESCE(tickets.custom_fields || (p_updates->>'custom_fields')::jsonb, custom_fields),
+        updated_at = now()
+      WHERE id = ANY(p_ticket_ids)
+      RETURNING *
+    )
+    SELECT count(*) INTO v_updated_count
+    FROM updated_tickets;
+
+    -- Insert audit records
+    FOR v_key, v_value IN SELECT * FROM jsonb_each(p_updates)
+    LOOP
+      INSERT INTO ticket_history (ticket_id, message, message_type)
+      SELECT 
+        t.id,
+        format('Field %s updated from %s to %s. Reason: %s',
+          v_key,
+          CASE
+            WHEN v_key = 'status' THEN t.status::text
+            WHEN v_key = 'priority' THEN t.priority::text
+            WHEN v_key = 'title' THEN t.title
+            WHEN v_key = 'description' THEN LEFT(t.description, 50) || '...'
+            WHEN v_key = 'assigned_agent_id' THEN COALESCE((SELECT name FROM users WHERE id = t.assigned_agent_id), 'unassigned')
+            WHEN v_key = 'assigned_team_id' THEN COALESCE((SELECT name FROM teams WHERE id = t.assigned_team_id), 'unassigned')
+            WHEN v_key = 'tags' THEN array_to_string(t.tags, ', ')
+            WHEN v_key = 'custom_fields' THEN t.custom_fields::text
+            ELSE 'unknown'
+          END,
+          CASE
+            WHEN v_key = 'status' THEN v_value#>>'{}'
+            WHEN v_key = 'priority' THEN v_value#>>'{}'
+            WHEN v_key = 'title' THEN v_value#>>'{}'
+            WHEN v_key = 'description' THEN LEFT(v_value#>>'{}', 50) || '...'
+            WHEN v_key = 'assigned_agent_id' THEN COALESCE((SELECT name FROM users WHERE id = (v_value#>>'{}')::uuid), 'unassigned')
+            WHEN v_key = 'assigned_team_id' THEN COALESCE((SELECT name FROM teams WHERE id = (v_value#>>'{}')::uuid), 'unassigned')
+            WHEN v_key = 'tags' THEN array_to_string((SELECT array_agg(value) FROM jsonb_array_elements_text(v_value)), ', ')
+            WHEN v_key = 'custom_fields' THEN v_value::text
+            ELSE 'unknown'
+          END,
+          p_reason
+        ),
+        'system'
+      FROM tickets t
+      WHERE t.id = ANY(p_ticket_ids);
+    END LOOP;
+
+    -- Return success response
+    RETURN jsonb_build_object(
+      'updated_count', v_updated_count,
+      'ticket_ids', p_ticket_ids
+    );
+  EXCEPTION
+    WHEN OTHERS THEN
+      -- Rollback happens automatically
+      RAISE EXCEPTION 'Error updating tickets: %', SQLERRM;
+  END;
+END;
+$$;
