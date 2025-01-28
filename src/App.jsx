@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import CreateTicket from './pages/CreateTicket.jsx'
 import TicketDetail from './components/tickets/TicketDetail'
 import AdminPortal from './pages/AdminPortal'
+import MassFilter from './pages/MassFilter'
 import Navbar from './components/ui/navbar'
 import { ThemeProvider } from './components/ui/theme-provider'
 import UserSettings from './components/user/UserSettings'
@@ -115,6 +116,7 @@ function App() {
               <Route element={<ProtectedRoute />}>
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/tickets/create" element={<CreateTicket />} />
+                <Route path="/tickets/filter" element={<MassFilter />} />
                 <Route path="/tickets/:id" element={<TicketDetail />} />
                 <Route path="/settings" element={<UserSettings />} />
 

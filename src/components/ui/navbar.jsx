@@ -39,6 +39,12 @@ export default function Navbar() {
                         >
                             Dashboard
                         </Link>
+                        <Link
+                            to="/tickets/filter"
+                            className={`text-sm font-medium ${location.pathname === '/tickets/filter' ? 'text-primary' : 'text-muted-foreground'}`}
+                        >
+                            Mass Filter
+                        </Link>
                         {userRole === 'admin' && (
                             <Link
                                 to="/admin"
