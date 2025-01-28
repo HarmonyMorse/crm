@@ -1,0 +1,18 @@
+# Cursor Rules
+
+## When using a shell
+
+USE BASH OR ZSH
+
+## When committing code, please follow these rules:
+
+1. Git status before committing to see what files are yet to be added/committed
+2. Add files explicitly to the commit message (never use `add .`)
+3. Add a short description of the changes to the commit message
+4. Keep the commit message concise and to the point
+5. Format the commit message using best practices
+   1. Use present tense
+   2. Do not end the commit message with a period
+   3. Make the commit message a single line
+   4. Capitalize the first letter of the commit message
+6. Git status after commiting to ensure all files are committed. Repeat these steps if necessarys
