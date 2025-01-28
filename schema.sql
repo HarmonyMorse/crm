@@ -16,6 +16,7 @@ DROP TYPE IF EXISTS custom_field_type CASCADE;
 
 -- Create extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Create ENUMs
 CREATE TYPE ticket_status AS ENUM ('open', 'pending', 'resolved');
@@ -64,7 +65,8 @@ CREATE TABLE tickets (
   assigned_agent_id UUID REFERENCES users(id) ON DELETE SET NULL,
   assigned_team_id UUID REFERENCES teams(id) ON DELETE SET NULL,
   tags TEXT[],
-  custom_fields JSONB DEFAULT '{}'::jsonb
+  custom_fields JSONB DEFAULT '{}'::jsonb,
+  embedding vector(1536)
 );
 
 -- Create team_members table
