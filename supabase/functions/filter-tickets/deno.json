@@ -1,0 +1,17 @@
+{
+    "tasks": {
+        "serve": "deno run --allow-net --allow-env index.ts"
+    },
+    "compilerOptions": {
+        "allowJs": true,
+        "lib": [
+            "deno.window"
+        ],
+        "strict": true
+    },
+    "imports": {
+        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.7.1",
+        "openai": "https://esm.sh/openai@4.28.0",
+        "http/server": "https://deno.land/std@0.168.0/http/server.ts"
+    }
+}

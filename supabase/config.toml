@@ -250,6 +250,11 @@ policy = "oneshot"
 inspector_port = 8083
 
 # Use these configurations to customize your Edge Function.
+[functions.filter-tickets]
+enabled = true
+verify_jwt = true
+import_map = "./functions/filter-tickets/deno.json"
+
 [functions.generate-embeddings]
 enabled = true
 verify_jwt = true
