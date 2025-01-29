@@ -27,4 +27,5 @@ docs/*
 # Env
 .env
 .env.*
+!.env.example
 hd*
