@@ -108,7 +108,9 @@ CREATE TABLE filter_metrics (
   start_time TIMESTAMPTZ NOT NULL,
   end_time TIMESTAMPTZ NOT NULL,
   tickets_processed INTEGER NOT NULL,
-  tickets_matched INTEGER NOT NULL
+  tickets_matched INTEGER NOT NULL,
+  user_accepted BOOLEAN,
+  selection_modified_at TIMESTAMPTZ
 );
 
 -- Add indexes for common queries

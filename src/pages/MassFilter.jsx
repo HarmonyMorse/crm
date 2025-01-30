@@ -25,11 +25,15 @@ export default function MassFilter() {
         assigned_team_id: null,
     });
     const [updating, setUpdating] = useState(false);
+    const [currentFilterId, setCurrentFilterId] = useState(null);
+    const [selectionModified, setSelectionModified] = useState(false);
+    const [initialSelection, setInitialSelection] = useState(new Set());
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
+        setSelectionModified(false); // Reset selection modified state on new filter
 
         try {
             // Get current user
@@ -70,7 +74,10 @@ export default function MassFilter() {
                 : functionResponse;
 
             // Extract data and parsedFilters from the parsed response
-            const { data, parsedFilters, metrics, error: responseError } = parsedResponse;
+            const { data, parsedFilters, metrics, filterId, error: responseError } = parsedResponse;
+
+            // Store the current filter ID for later use
+            setCurrentFilterId(filterId);
 
             // Only throw an error if we have an explicit error and no data
             if (responseError && !data) {
@@ -78,9 +85,11 @@ export default function MassFilter() {
                 throw new Error(responseError);
             }
 
+            const initialTicketSelection = new Set((data || []).map(ticket => ticket.id));
             setTickets(data || []);
             setParsedFilters(parsedFilters || {});
-            setSelectedTickets(new Set((data || []).map(ticket => ticket.id)));
+            setSelectedTickets(initialTicketSelection);
+            setInitialSelection(initialTicketSelection); // Store initial selection for comparison
 
             // Log metrics if available
             if (metrics) {
@@ -107,16 +116,16 @@ export default function MassFilter() {
             setTickets([]);
             setParsedFilters(null);
             setSelectedTickets(new Set());
+            setInitialSelection(new Set());
         }
         setLoading(false);
     };
 
     const handleSelectAll = (checked) => {
-        if (checked) {
-            setSelectedTickets(new Set(tickets.map(ticket => ticket.id)));
-        } else {
-            setSelectedTickets(new Set());
-        }
+        const newSelection = checked ? new Set(tickets.map(ticket => ticket.id)) : new Set();
+        setSelectedTickets(newSelection);
+        // Only mark as modified if the selection differs from initial
+        setSelectionModified(!setsAreEqual(newSelection, initialSelection));
     };
 
     const handleSelectTicket = (ticketId) => {
@@ -127,6 +136,56 @@ export default function MassFilter() {
             newSelected.add(ticketId);
         }
         setSelectedTickets(newSelected);
+        // Only mark as modified if the selection differs from initial
+        setSelectionModified(!setsAreEqual(newSelected, initialSelection));
+    };
+
+    // Helper function to compare sets
+    const setsAreEqual = (a, b) => {
+        if (a.size !== b.size) return false;
+        for (const item of a) {
+            if (!b.has(item)) return false;
+        }
+        return true;
+    };
+
+    // New function to refresh tickets without creating new metrics
+    const refreshTickets = async () => {
+        try {
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                throw new Error('You must be logged in to filter tickets');
+            }
+
+            // Re-run the same query but don't create new metrics
+            const { data: functionResponse, error: invokeError } = await supabase.functions.invoke('filter-tickets', {
+                body: {
+                    query,
+                    userId: user.id,
+                    skipMetrics: true // Add flag to skip metrics creation
+                },
+            });
+
+            if (invokeError) throw invokeError;
+
+            const parsedResponse = typeof functionResponse === 'string'
+                ? JSON.parse(functionResponse)
+                : functionResponse;
+
+            const { data, error: responseError } = parsedResponse;
+
+            if (responseError) throw new Error(responseError);
+
+            setTickets(data || []);
+        } catch (err) {
+            console.error('Error refreshing tickets:', err);
+            toast({
+                title: "Refresh failed",
+                description: "Failed to refresh ticket list. Please try again.",
+                variant: "destructive",
+            });
+        }
     };
 
     const handleBulkUpdate = async () => {
@@ -141,6 +200,21 @@ export default function MassFilter() {
 
         setUpdating(true);
         try {
+            // Update filter metrics with user acceptance information
+            if (currentFilterId) {
+                const { error: metricsError } = await supabase
+                    .from('filter_metrics')
+                    .update({
+                        user_accepted: !selectionModified,
+                        selection_modified_at: selectionModified ? new Date().toISOString() : null
+                    })
+                    .eq('id', currentFilterId);
+
+                if (metricsError) {
+                    console.error('Error updating filter metrics:', metricsError);
+                }
+            }
+
             // Clean up updates object to only include fields that were changed
             const updates = Object.entries(bulkUpdates).reduce((acc, [key, value]) => {
                 if (value) {
@@ -187,8 +261,12 @@ export default function MassFilter() {
                 assigned_team_id: null,
             });
 
-            // Refresh the tickets list
-            handleSubmit(new Event('submit'));
+            // Reset selection tracking
+            setSelectionModified(false);
+            setCurrentFilterId(null);
+
+            // Refresh the tickets list without creating new metrics
+            await refreshTickets();
 
         } catch (err) {
             console.error('Bulk update error:', err);

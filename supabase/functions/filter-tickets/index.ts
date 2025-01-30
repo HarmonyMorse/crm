@@ -132,7 +132,7 @@ serve(async (req) => {
       )
     }
 
-    const { query, userId } = body;
+    const { query, userId, skipMetrics } = body;
     if (!query) {
       console.error('No query provided in request');
       return new Response(
@@ -217,26 +217,34 @@ serve(async (req) => {
       const endTime = new Date();
       const matchedCount = data?.length || 0;
 
-      // Store filter metrics
-      const { error: metricsError } = await supabase
-        .from('filter_metrics')
-        .insert({
-          user_id: userId,
-          request_payload: { query, ...body },
-          filter_criteria: parsedFilters,
-          response_summary: {
-            success: true,
-            matched_count: matchedCount,
-            filters_applied: Object.keys(parsedFilters).length
-          },
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
-          tickets_processed: await getTotalTicketsCount(supabase),
-          tickets_matched: matchedCount
-        });
+      // Store filter metrics only if not skipping
+      let metricsRecord = null;
+      if (!skipMetrics) {
+        const { data: metricsData, error: metricsError } = await supabase
+          .from('filter_metrics')
+          .insert({
+            user_id: userId,
+            request_payload: { query, ...body },
+            filter_criteria: parsedFilters,
+            response_summary: {
+              success: true,
+              matched_count: matchedCount,
+              filters_applied: Object.keys(parsedFilters).length
+            },
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            tickets_processed: await getTotalTicketsCount(supabase),
+            tickets_matched: matchedCount,
+            user_accepted: null // Initialize as null
+          })
+          .select()
+          .single();
 
-      if (metricsError) {
-        console.error('Error storing filter metrics:', metricsError);
+        if (metricsError) {
+          console.error('Error storing filter metrics:', metricsError);
+        } else {
+          metricsRecord = metricsData;
+        }
       }
 
       console.log(`Query returned ${matchedCount} results`);
@@ -248,7 +256,8 @@ serve(async (req) => {
           metrics: {
             duration_ms: endTime.getTime() - startTime.getTime(),
             matched_count: matchedCount
-          }
+          },
+          filterId: metricsRecord?.id // Include the filter metrics ID in the response
         }),
         { 
           status: 200,
