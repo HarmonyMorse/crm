@@ -32,9 +32,18 @@ export default function MassFilter() {
         setError(null);
 
         try {
+            // Get current user
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                throw new Error('You must be logged in to filter tickets');
+            }
+
             console.log('Sending request with query:', query);
             const { data: functionResponse, error: invokeError } = await supabase.functions.invoke('filter-tickets', {
-                body: { query },
+                body: {
+                    query,
+                    userId: user.id
+                },
             });
 
             console.log('Full response object:', { functionResponse, invokeError });
@@ -61,7 +70,7 @@ export default function MassFilter() {
                 : functionResponse;
 
             // Extract data and parsedFilters from the parsed response
-            const { data, parsedFilters, error: responseError } = parsedResponse;
+            const { data, parsedFilters, metrics, error: responseError } = parsedResponse;
 
             // Only throw an error if we have an explicit error and no data
             if (responseError && !data) {
@@ -72,6 +81,11 @@ export default function MassFilter() {
             setTickets(data || []);
             setParsedFilters(parsedFilters || {});
             setSelectedTickets(new Set((data || []).map(ticket => ticket.id)));
+
+            // Log metrics if available
+            if (metrics) {
+                console.log('Filter metrics:', metrics);
+            }
         } catch (err) {
             console.error('Detailed error in handleSubmit:', {
                 name: err.name,
@@ -93,9 +107,8 @@ export default function MassFilter() {
             setTickets([]);
             setParsedFilters(null);
             setSelectedTickets(new Set());
-        } finally {
-            setLoading(false);
         }
+        setLoading(false);
     };
 
     const handleSelectAll = (checked) => {
