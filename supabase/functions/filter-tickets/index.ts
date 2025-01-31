@@ -82,6 +82,9 @@ serve(async (req) => {
   try {
     console.log('Received request method:', req.method);
     
+    // Record start time for metrics
+    const startTime = new Date();
+    
     // Pull environment variables for Supabase & OpenAI
     const supabaseUrl = Deno.env.get("SUPABASE_URL")
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")
@@ -129,7 +132,7 @@ serve(async (req) => {
       )
     }
 
-    const { query } = body;
+    const { query, userId, skipMetrics } = body;
     if (!query) {
       console.error('No query provided in request');
       return new Response(
@@ -210,12 +213,51 @@ serve(async (req) => {
         throw queryError;
       }
 
-      console.log(`Query returned ${data?.length || 0} results`);
+      // Record end time and store metrics
+      const endTime = new Date();
+      const matchedCount = data?.length || 0;
+
+      // Store filter metrics only if not skipping
+      let metricsRecord = null;
+      if (!skipMetrics) {
+        const { data: metricsData, error: metricsError } = await supabase
+          .from('filter_metrics')
+          .insert({
+            user_id: userId,
+            request_payload: { query, ...body },
+            filter_criteria: parsedFilters,
+            response_summary: {
+              success: true,
+              matched_count: matchedCount,
+              filters_applied: Object.keys(parsedFilters).length
+            },
+            start_time: startTime.toISOString(),
+            end_time: endTime.toISOString(),
+            tickets_processed: await getTotalTicketsCount(supabase),
+            tickets_matched: matchedCount,
+            user_accepted: null // Initialize as null
+          })
+          .select()
+          .single();
+
+        if (metricsError) {
+          console.error('Error storing filter metrics:', metricsError);
+        } else {
+          metricsRecord = metricsData;
+        }
+      }
+
+      console.log(`Query returned ${matchedCount} results`);
       return new Response(
         JSON.stringify({
           success: true,
           data,
           parsedFilters,
+          metrics: {
+            duration_ms: endTime.getTime() - startTime.getTime(),
+            matched_count: matchedCount
+          },
+          filterId: metricsRecord?.id // Include the filter metrics ID in the response
         }),
         { 
           status: 200,
@@ -249,3 +291,17 @@ serve(async (req) => {
     )
   }
 })
+
+// Helper function to get total number of tickets
+async function getTotalTicketsCount(supabase: any): Promise<number> {
+  const { count, error } = await supabase
+    .from('tickets')
+    .select('*', { count: 'exact', head: true });
+  
+  if (error) {
+    console.error('Error getting total tickets count:', error);
+    return 0;
+  }
+  
+  return count || 0;
+}

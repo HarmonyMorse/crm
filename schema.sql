@@ -6,6 +6,7 @@ DROP TABLE IF EXISTS teams CASCADE;
 DROP TABLE IF EXISTS tickets CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
 DROP TABLE IF EXISTS custom_field_definitions CASCADE;
+DROP TABLE IF EXISTS filter_metrics CASCADE;
 
 -- Drop existing types
 DROP TYPE IF EXISTS ticket_status CASCADE;
@@ -96,6 +97,22 @@ CREATE TABLE ticket_history (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Create filter_metrics table
+CREATE TABLE filter_metrics (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  user_id UUID REFERENCES users(id),
+  request_payload JSONB NOT NULL,
+  filter_criteria JSONB NOT NULL,
+  response_summary JSONB NOT NULL,
+  start_time TIMESTAMPTZ NOT NULL,
+  end_time TIMESTAMPTZ NOT NULL,
+  tickets_processed INTEGER NOT NULL,
+  tickets_matched INTEGER NOT NULL,
+  user_accepted BOOLEAN,
+  selection_modified_at TIMESTAMPTZ
+);
+
 -- Add indexes for common queries
 CREATE INDEX idx_tickets_customer_id ON tickets(customer_id);
 CREATE INDEX idx_tickets_status ON tickets(status);
@@ -105,6 +122,11 @@ CREATE INDEX idx_ticket_history_ticket_id ON ticket_history(ticket_id);
 CREATE INDEX idx_notes_ticket_id ON notes(ticket_id);
 CREATE INDEX idx_team_members_team_id ON team_members(team_id);
 CREATE INDEX idx_team_members_user_id ON team_members(user_id);
+
+-- Create indexes for filter_metrics
+CREATE INDEX idx_filter_metrics_user_id ON filter_metrics(user_id);
+CREATE INDEX idx_filter_metrics_start_time ON filter_metrics(start_time);
+CREATE INDEX idx_filter_metrics_end_time ON filter_metrics(end_time);
 
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
@@ -320,6 +342,22 @@ CREATE POLICY custom_field_definitions_select_all ON custom_field_definitions
 
 CREATE POLICY custom_field_definitions_modify_admin ON custom_field_definitions
   FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM users u 
+      WHERE u.id = auth.uid() 
+      AND u.role = 'admin'
+    )
+  );
+
+-- Filter metrics policies
+CREATE POLICY filter_metrics_insert_authenticated ON filter_metrics
+  FOR INSERT WITH CHECK (
+    auth.uid() = user_id
+  );
+
+CREATE POLICY filter_metrics_select_own ON filter_metrics
+  FOR SELECT USING (
+    user_id = auth.uid() OR
     EXISTS (
       SELECT 1 FROM users u 
       WHERE u.id = auth.uid() 
