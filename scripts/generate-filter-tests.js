@@ -80,7 +80,7 @@ async function runTestCases() {
                     body: {
                         query: testCase.query,
                         userId: user.id,
-                        skipMetrics: true
+                        skipMetrics: false
                     }
                 });
 
