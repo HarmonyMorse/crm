@@ -3,7 +3,8 @@
     "version": "1.0.0",
     "type": "module",
     "scripts": {
-        "backfill": "node backfill-embeddings.js"
+        "backfill": "node backfill-embeddings.js",
+        "test-filters": "node generate-filter-tests.js"
     },
     "dependencies": {
         "@supabase/supabase-js": "^2.39.3",
